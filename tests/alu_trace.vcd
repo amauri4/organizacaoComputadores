@@ -1,0 +1,132 @@
+$date
+     May 10, 2025       11:02:09
+$end
+
+$version
+ SystemC 2.3.4-Accellera --- May  6 2025 23:35:20
+$end
+
+$timescale
+     1 ps
+$end
+
+$scope module SystemC $end
+$var wire    1  aaaaa  clk       $end
+$var wire   32  aaaab  a [31:0]  $end
+$var wire   32  aaaac  b [31:0]  $end
+$var wire    4  aaaad  alu_ctrl_direct [3:0]  $end
+$var wire    4  aaaae  alu_ctrl_auto [3:0]  $end
+$var wire    4  aaaaf  alu_ctrl_muxed [3:0]  $end
+$var wire   32  aaaag  result [31:0]  $end
+$var wire    1  aaaah  zero       $end
+$var wire    2  aaaai  alu_op [1:0]  $end
+$var wire    6  aaaaj  funct [5:0]  $end
+$var wire    1  aaaak  use_auto_control       $end
+$upscope $end
+$enddefinitions  $end
+
+$comment
+All initial values are dumped below at time 0 sec = 0 timescale units.
+$end
+
+$dumpvars
+1aaaaa
+b1010 aaaab
+b10100 aaaac
+b10 aaaad
+b10 aaaae
+b10 aaaaf
+b11110 aaaag
+0aaaah
+b0 aaaai
+b0 aaaaj
+0aaaak
+$end
+
+#5000
+0aaaaa
+
+#10000
+1aaaaa
+b11110 aaaab
+b1010 aaaac
+b110 aaaad
+b110 aaaaf
+b10100 aaaag
+
+#15000
+0aaaaa
+
+#20000
+1aaaaa
+b11110000111100001111000011110000 aaaab
+b11111111111111110000000000000000 aaaac
+b0 aaaad
+b0 aaaaf
+b11110000111100000000000000000000 aaaag
+
+#25000
+0aaaaa
+
+#30000
+1aaaaa
+b10 aaaaf
+b11110000111011111111000011110000 aaaag
+b10 aaaai
+b100000 aaaaj
+1aaaak
+
+#35000
+0aaaaa
+
+#40000
+1aaaaa
+b1010 aaaab
+b10100 aaaac
+b10 aaaad
+b11110 aaaag
+
+#45000
+0aaaaa
+
+#50000
+1aaaaa
+b110 aaaae
+b110 aaaaf
+b11111111111111111111111111110110 aaaag
+b100010 aaaaj
+
+#55000
+0aaaaa
+
+#60000
+1aaaaa
+b11110 aaaab
+b1010 aaaac
+b110 aaaad
+b10100 aaaag
+
+#65000
+0aaaaa
+
+#70000
+1aaaaa
+b0 aaaae
+b0 aaaaf
+b1010 aaaag
+b100100 aaaaj
+
+#75000
+0aaaaa
+
+#80000
+1aaaaa
+b11110000111100001111000011110000 aaaab
+b11111111111111110000000000000000 aaaac
+b0 aaaad
+b11110000111100000000000000000000 aaaag
+
+#85000
+0aaaaa
+
+#90000
