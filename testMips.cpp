@@ -46,19 +46,21 @@ int sc_main(int argc, char* argv[]) {
     cout << "Reset concluído @ " << sc_time_stamp() << endl;
 
     // Execução de ciclos com monitoramento
-    for (int i = 0; i < 3; ++i) {
-        //cout << "\n--- Ciclo " << i << " ---" << endl;
-        //cout << "Estado pré-clk @ " << sc_time_stamp() << ":" << endl;
-        //cout << "PC: 0x" << hex << debug_pc.read() << endl;
-       // cout << "Instrução: 0x" << debug_instruction.read() << endl;
+    for (int i = 0; i < 4; ++i) {
+        cout << "\n--- Ciclo " << i << " ---" << endl;
+        cout << "Estado pré-clk @ " << sc_time_stamp() << ":" << endl;
+        cout << "PC: 0x" << hex << debug_pc.read() << endl;
+        cout << "Instrução: 0x" << debug_instruction.read() << endl;
 
         sc_start(10, SC_NS);  // Avança um ciclo de clock
 
-       // cout << "Estado pós-clk @ " << sc_time_stamp() << ":" << endl;
-       // cout << "PC: 0x" << debug_pc.read() << endl;
-       // cout << "Próximo PC: 0x" << mips.pc_next.read() << endl;
+        cout << "Estado pós-clk @ " << sc_time_stamp() << ":" << endl;
+        cout << "PC: 0x" << debug_pc.read() << endl;
+        cout << "Próximo PC: 0x" << mips.pc_next.read() << endl;
     }
 
     cout << "\nSimulação concluída com sucesso!" << endl;
     return 0;
 }
+
+

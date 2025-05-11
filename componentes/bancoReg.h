@@ -20,6 +20,12 @@ SC_MODULE(RegisterFile) {
             registers[write_reg.read()] = write_data.read();
         }
     }
+
+    void dump_registers(sc_uint<32> out_regs[32]) const {
+        for (int i = 0; i < 32; ++i) {
+            out_regs[i] = registers[i];
+        }
+    }
     
     SC_CTOR(RegisterFile) {
         for (int i = 0; i < 32; i++) {
