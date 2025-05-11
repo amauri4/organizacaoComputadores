@@ -100,7 +100,6 @@ private:
     }
 
     void show_debug() {
-        // Aqui, ao invés de atribuir diretamente a debug_pc, apenas mostre a saída.
         debug_pc.write(pc_out.read());  // Atualiza a saída debug
         debug_instruction.write(instruction.read());  // Atualiza a saída debug
 
@@ -114,6 +113,17 @@ private:
         cout << "imm: 0x" << hex << imm.read() << "\tfunct: 0x" << funct.read() << endl;
         cout << "DestReg (mux): $" << dec << write_reg.read() << endl;
         cout << "PC+4: 0x" << hex << pc_plus4.read() << endl;
+    }
+public: 
+
+    void load_program(const std::vector<uint32_t>& instructions) {
+        for (auto instr : instructions) {
+            imem->add_instruction(instr);
+        }
+    }
+
+    void load_instruction(uint32_t instruction) {
+        imem->add_instruction(instruction);
     }
 };
 
