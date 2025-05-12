@@ -105,7 +105,7 @@ SC_MODULE(MIPS_Simplificado) {
 
         // Atualização de sinais derivados
         SC_METHOD(update_signals);
-        sensitive << opcode << rt << rd << pc_plus4;
+        sensitive << clk.pos();
 
         // Depuração
         SC_METHOD(show_debug);
@@ -125,24 +125,28 @@ private:
     void update_signals() {
         reg_dst.write(opcode.read() == 0);
         pc_next.write(pc_plus4.read());
-        reg_write.write(opcode.read() == 0);
+        // Ativa RegWrite para: R-type (opcode=0), lw (0x23), addi (0x08), etc.
+        reg_write.write(
+            opcode.read() == 0 ||    // R-type
+            opcode.read() == 0x23 || // lw
+            opcode.read() == 0x08    // addi
+        );
     }
 
     void show_debug() {
-        debug_pc.write(pc_out.read());  // Atualiza a saída debug
-        debug_instruction.write(instruction.read());  // Atualiza a saída debug
-
-        //Debug na saída
-    //     cout << "---------------------------" << endl;
-    //     cout << "Ciclo @ " << sc_time_stamp() << endl;
-    //     cout << "PC: 0x" << hex << pc_out.read() << endl;
-    //     cout << "Instr: 0x" << hex << instruction.read() << endl;
-    //    cout << "Opcode: 0x" << hex << opcode.read() << endl;
-    //    cout << "rs: $" << dec << rs.read() << "\trt: $" << rt.read() << "\trd: $" << rd.read() << endl;
-    //     cout << "imm: 0x" << hex << imm.read() << "\tfunct: 0x" << funct.read() << endl;
-    //     cout << "DestReg (mux): $" << dec << write_reg.read() << endl;
-    //     cout << "PC+4: 0x" << hex << pc_plus4.read() << endl;
+        debug_pc.write(pc_out.read());
+        debug_instruction.write(instruction.read());
+        
+        cout << "---------------------------" << endl;
+        cout << "Ciclo @ " << sc_time_stamp() << endl;
+        cout << "PC: 0x" << hex << pc_out.read() << endl;
+        cout << "Instr: 0x" << hex << instruction.read() << endl;
+        cout << "Opcode: 0x" << hex << opcode.read() << endl;
+        cout << "rs: $" << dec << rs.read() << "\trt: $" << rt.read() << "\trd: $" << rd.read() << endl;
+        cout << "RegWrite: " << reg_write.read() << " WriteReg: $" << dec << write_reg.read() << endl;
+        cout << "WriteData: 0x" << hex << write_data_reg.read() << endl;
     }
+    
 public: 
     sc_uint<32> registers[32]; 
 

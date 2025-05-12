@@ -7,6 +7,7 @@ using namespace std;
 
 // Função para imprimir registradores (deve ser implementada no seu MIPS)
 void print_registradores(MIPS_Simplificado& mips) {
+    mips.visualization_registers();
     cout << "Banco de Registradores:" << endl;
     for(int i = 0; i < 4; ++i) {  // Mostra apenas os primeiros 4 para exemplo
         cout << "$" << dec << i << " = 0x" << hex << setw(8) 
@@ -47,9 +48,9 @@ int sc_main(int argc, char* argv[]) {
     // Programa de teste com operações no banco de registradores
     vector<uint32_t> programa_teste = {
         0x20010005,  // addi $1, $0, 5     | $1 = 5
-        0x2002000A,  // addi $2, $0, 10    | $2 = 10
-        0x00221820,  // add $3, $1, $2     | $3 = 15
-        0xAC030000   // sw $3, 0($0)       | Mem[0] = 15
+        //0x2002000A,  // addi $2, $0, 10    | $2 = 10
+        //0x00221820,  // add $3, $1, $2     | $3 = 15
+        //0xAC030000   // sw $3, 0($0)       | Mem[0] = 15
     };
     
     mips.load_program(programa_teste);
@@ -71,21 +72,21 @@ int sc_main(int argc, char* argv[]) {
     cout << "Reset concluído @ " << sc_time_stamp() << endl;
 
     // Execução de ciclos com monitoramento detalhado
-    for (int ciclo = 0; ciclo < 5; ++ciclo) {
+    for (int ciclo = 0; ciclo < 2; ++ciclo) {
         cout << "\n--- Ciclo " << dec << ciclo << " ---" << endl;
         
         // Estado pré-clock
-        cout << "Estado pré-clk @ " << sc_time_stamp() << ":" << endl;
-        cout << "PC: 0x" << hex << setw(8) << debug_pc.read() << endl;
-        cout << "Instrução: 0x" << setw(8) << debug_instruction.read() << endl;
+        //cout << "Estado pré-clk @ " << sc_time_stamp() << ":" << endl;
+        //cout << "PC: 0x" << hex << setw(8) << debug_pc.read() << endl;
+        //cout << "Instrução: 0x" << setw(8) << debug_instruction.read() << endl;
         print_registradores(mips);  // Função personalizada
 
         // Avança um ciclo
         sc_start(10, SC_NS);
 
         // Estado pós-clock
-        cout << "\nEstado pós-clk @ " << sc_time_stamp() << ":" << endl;
-        cout << "Próximo PC: 0x" << setw(8) << mips.pc_next.read() << endl;
+        //cout << "\nEstado pós-clk @ " << sc_time_stamp() << ":" << endl;
+        //cout << "Próximo PC: 0x" << setw(8) << mips.pc_next.read() << endl;
         
         // Verificações específicas
         switch(ciclo) {

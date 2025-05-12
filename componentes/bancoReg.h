@@ -19,9 +19,11 @@ SC_MODULE(RegisterFile) {
         if (reg_write.read() && write_reg.read() != 0) { // $zero não pode ser escrito
             registers[write_reg.read()] = write_data.read();
         }
+        std::cout << "\n" << "aquiiiiii" << registers[write_reg.read()] << "\n";
+
     }
 
-    void dump_registers(sc_uint<32> out_regs[32]) const {
+    void dump_registers(sc_uint<32>* out_regs) const {
         for (int i = 0; i < 32; ++i) {
             out_regs[i] = registers[i];
         }
