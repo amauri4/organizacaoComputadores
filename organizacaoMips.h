@@ -8,6 +8,12 @@
 #include "./componentes/mux.h"
 #include "./componentes/somador.h"
 #include "./componentes/bancoReg.h"
+#include "./componentes/extensorSinal.h"
+#include "./componentes/ula.h"
+#include "./componentes/controleUla.h"
+#include "./componentes/deslocador26to32.h"
+#include "./componentes/deslocador32.h"
+#include "./componentes/somadorEnderecos.h"
 
 SC_MODULE(MIPS_Simplificado) {
     // Portas principais
@@ -27,17 +33,26 @@ SC_MODULE(MIPS_Simplificado) {
     sc_signal<sc_uint<6>> funct;
     sc_signal<sc_uint<32>> const_four;
     sc_signal<sc_uint<5>> write_reg;
+    sc_signal<sc_uint<26>> jump_addr_raw;
+    sc_signal<sc_uint<28>> jump_addr_shifted;
+    sc_signal<sc_uint<32>> jump_target;
+    
+    sc_signal<sc_int<32>> extended_signal;
+
+    sc_signal<sc_int<32>> extended_signal_add;
+
+    sc_signal<sc_int<32>> pc_add_offset;
 
     sc_signal<sc_uint<32>> write_data_reg;
     sc_signal<sc_uint<32>> read_data_1;
     sc_signal<sc_uint<32>> read_data_2;
 
+    sc_signal<sc_uint<4>> alu_control;
 
     // Sinais de controle
     sc_signal<bool> reg_dst;
     sc_signal<bool> reg_write;
-
-    // Banco de registradores para visualização
+    sc_signal<sc_uint<2>> alu_op;
 
     // Componentes
     PC* pc;
@@ -45,7 +60,14 @@ SC_MODULE(MIPS_Simplificado) {
     Decodificador* decod;
     Mux<5>* mux_regdst;
     Adder* adder_pc;
+    AdderAddress* adder_endereco;
     RegisterFile* regs;
+    SignExtend* signE;
+    //ALU* ula;
+    ALUControl* ulaControle;
+    //Mux<32>* mux_ula;
+    Shifter_26to28* deslocador26to32;
+    Shifter_32b* deslocador32;
 
     SC_CTOR(MIPS_Simplificado) {
         // Instanciando componentes
@@ -54,7 +76,14 @@ SC_MODULE(MIPS_Simplificado) {
         decod = new Decodificador("DECOD");
         mux_regdst = new Mux<5>("MUX_REGDST");
         adder_pc = new Adder("ADDER_PC");
+        adder_endereco = new AdderAddress("ADDER_ENDERECO");
         regs = new RegisterFile("BANCO_REGISTRADORES");
+        signE = new SignExtend("EXTENSOR_SINAL");
+        //ula = new ALU("ULA");
+        ulaControle = new ALUControl("CONTROLE_ULA");
+        //mux_ula = new Mux<32>("MUX_ULA");
+        deslocador26to32 = new Shifter_26to28("DESLOCADOR_26_TO_32");
+        deslocador32 = new Shifter_32b("DESLOCADOR_32");
 
         // Constante 4
         const_four.write(4);
@@ -77,11 +106,39 @@ SC_MODULE(MIPS_Simplificado) {
         decod->rd(rd);
         decod->imm(imm);
         decod->funct(funct);
+        decod->jump_address(jump_addr_raw);
 
         // Adição de PC + 4
         adder_pc->a(pc_out);
         adder_pc->b(const_four);
         adder_pc->sum(pc_plus4);
+
+        // Deslocador para cálculo do Jump
+        deslocador26to32->input(jump_addr_raw);
+        deslocador26to32->output(jump_addr_shifted);
+
+        // Cálculo do endereço final (PC+4[31..28] || jump_addr_shifted)
+        jump_target.write((pc_plus4.read().range(31, 28), jump_addr_shifted.read()));
+
+        // Extensor de sinal
+        signE->input(imm);
+        signE->output(extended_signal);
+
+        // Deslocador de 32 bits
+        deslocador32->input(extended_signal);
+        deslocador32->output(extended_signal_add);
+
+        // Somador endereços
+        adder_endereco->a(pc_plus4);
+        adder_endereco->b(extended_signal_add);
+        adder_endereco->sum(pc_add_offset);
+
+        // Mux offset com PC
+
+        // ULA controle
+        ulaControle->alu_op(alu_op);
+        ulaControle->funct(funct);
+        ulaControle->alu_control(alu_control);
 
         // Multiplexador para registrador destino
         mux_regdst->input0(rt);

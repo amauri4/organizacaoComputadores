@@ -9,6 +9,7 @@ SC_MODULE(Decodificador) {
     sc_out<sc_uint<5>> rs, rt, rd;
     sc_out<sc_uint<16>> imm;
     sc_out<sc_uint<6>> funct;
+    sc_out<sc_uint<26>> jump_address; 
 
     SC_CTOR(Decodificador) {
         SC_METHOD(decode);
@@ -23,6 +24,7 @@ SC_MODULE(Decodificador) {
         rd.write(inst.range(15, 11));
         imm.write(inst.range(15, 0));
         funct.write(inst.range(5, 0));
+        jump_address.write(inst.range(25, 0));
     }
 };
 

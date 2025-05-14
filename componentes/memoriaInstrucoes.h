@@ -14,7 +14,11 @@ SC_MODULE(InstructionMemory) {
 
     // Corrigido: Formatação correta de 32 bits
     void add_instruction(uint32_t instr) {
+        std::cout << "Armazenando: 0x" << std::hex << std::setw(8) << instr << std::endl;
+
         mem.push_back(static_cast<sc_uint<32>>(instr));
+
+        std::cout << "Armazenado: 0x" << std::hex << std::setw(8) << mem.back().to_uint() << std::endl;
     }
 
     void read_process() {
@@ -38,9 +42,7 @@ SC_MODULE(InstructionMemory) {
 
         for (size_t i = 0; i < mem.size(); ++i) {
             std::cout << "0x" << std::hex << std::setw(8) << std::setfill('0') 
-                      << (i * 4) << ": 0x"
-                      << std::setw(8) << std::setfill('0') 
-                      << mem[i].to_uint() << '\n';
+                      << (mem[i].to_uint() & 0xFFFFFFFF) << '\n';
         }
 
     }

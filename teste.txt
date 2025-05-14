@@ -21,3 +21,10 @@
     ALU *alu;
     ALUControl *alu_control;
     DataMemory *dmem;
+
+ g++ -std=c++17 -stdlib=libc++ \                                                   
+    -I/Users/amauri/Documents/organizacaoProjeto1/systemc-2.3.4/build-arm64/install/include \
+    -L/Users/amauri/Documents/organizacaoProjeto1/systemc-2.3.4/build-arm64/install/lib \
+    -Wl,-rpath,/Users/amauri/Documents/organizacaoProjeto1/systemc-2.3.4/build-arm64/install/lib \
+    -lsystemc \
+    -o test testeMips2.cpp
