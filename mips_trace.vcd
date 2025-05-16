@@ -1,5 +1,5 @@
 $date
-     May 10, 2025       16:50:01
+     May 15, 2025       22:59:13
 $end
 
 $version
@@ -13,17 +13,17 @@ $end
 $scope module SystemC $end
 $var wire    1  aaaaa  clk       $end
 $var wire    1  aaaab  reset       $end
-$var wire   32  aaaac  pc_out [31:0]  $end
+$var wire   32  aaaac  pc [31:0]  $end
 $var wire   32  aaaad  instruction [31:0]  $end
-$var wire   32  aaaae  alu_result [31:0]  $end
-$var wire    1  aaaaf  reg_dst       $end
-$var wire    1  aaaag  alu_src       $end
-$var wire    1  aaaah  mem_to_reg       $end
-$var wire    1  aaaai  reg_write       $end
-$var wire    1  aaaaj  mem_read       $end
-$var wire    1  aaaak  mem_write       $end
-$var wire    1  aaaal  branch       $end
-$var wire    1  aaaam  jump       $end
+$var wire   32  aaaae  read_data1 [31:0]  $end
+$var wire   32  aaaaf  read_data2 [31:0]  $end
+$var wire   32  aaaag  ula_operand2 [31:0]  $end
+$var wire    4  aaaah  alu_control [3:0]  $end
+$var wire   32  aaaai  ula_result [31:0]  $end
+$var wire    1  aaaaj  zero       $end
+$var wire    1  aaaak  reg_write       $end
+$var wire    1  aaaal  reg_dst       $end
+$var wire    1  aaaam  alu_src       $end
 $upscope $end
 $enddefinitions  $end
 
@@ -35,16 +35,16 @@ $dumpvars
 1aaaaa
 1aaaab
 b0 aaaac
-b0 aaaad
+b100000000000010000000000000101 aaaad
 b0 aaaae
-1aaaaf
-0aaaag
-0aaaah
-1aaaai
+b0 aaaaf
+b101 aaaag
+b10 aaaah
+b101 aaaai
 0aaaaj
-0aaaak
+1aaaak
 0aaaal
-0aaaam
+1aaaam
 $end
 
 #5000
@@ -55,15 +55,82 @@ $end
 
 #15000
 0aaaaa
-0aaaab
 
 #20000
 1aaaaa
-b100 aaaac
-b100000000000100000000000010100 aaaad
-0aaaaf
-0aaaai
 
 #25000
+0aaaaa
+
+#30000
+1aaaaa
+0aaaab
+
+#35000
+0aaaaa
+
+#40000
+1aaaaa
+b100 aaaac
+b100000000000100000000000001010 aaaad
+b1010 aaaag
+b1010 aaaai
+
+#45000
+0aaaaa
+
+#50000
+1aaaaa
+
+#55000
+0aaaaa
+
+#60000
+1aaaaa
+b1000 aaaac
+b1000100001100000100000 aaaad
+b101 aaaae
+b1010 aaaaf
+b1111 aaaai
+1aaaal
+0aaaam
+
+#65000
+0aaaaa
+
+#70000
+1aaaaa
+
+#75000
+0aaaaa
+
+#80000
+1aaaaa
+b1100 aaaac
+b1000100010000000100010 aaaad
+b110 aaaah
+b11111111111111111111111111111011 aaaai
+
+#85000
+0aaaaa
+
+#90000
+1aaaaa
+
+#95000
+0aaaaa
+
+#100000
+1aaaaa
+b10000 aaaac
+b100000000001011111111111111011 aaaad
+b0 aaaae
+b0 aaaaf
+b11111111111111111111111111111011 aaaag
+b10 aaaah
+0aaaal
+1aaaam
+
+#105000
 0aaaaa
 

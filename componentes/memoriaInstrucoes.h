@@ -12,13 +12,22 @@ SC_MODULE(InstructionMemory) {
     
     std::vector<sc_uint<32>> mem;
 
-    // Corrigido: Formatação correta de 32 bits
     void add_instruction(uint32_t instr) {
-        std::cout << "Armazenando: 0x" << std::hex << std::setw(8) << instr << std::endl;
+        // Garante que o valor é truncado para 32 bits
+        uint32_t masked_instr = instr & 0xFFFFFFFF;
+        
+        std::cout << "Armazenando: 0x" 
+                << std::hex << std::setw(8) << std::setfill('0') 
+                << masked_instr << std::endl;
 
-        mem.push_back(static_cast<sc_uint<32>>(instr));
+        mem.push_back(static_cast<sc_uint<32>>(masked_instr));
 
-        std::cout << "Armazenado: 0x" << std::hex << std::setw(8) << mem.back().to_uint() << std::endl;
+        // Verificação rigorosa
+        uint32_t stored_value = mem.back().to_uint();
+        if (stored_value != masked_instr) {
+            std::cerr << "ERRO: Valor armazenado (0x" << std::hex << stored_value
+                    << ") difere do input (0x" << masked_instr << ")" << std::endl;
+        }
     }
 
     void read_process() {

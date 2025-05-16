@@ -14,6 +14,12 @@
 #include "./componentes/deslocador26to32.h"
 #include "./componentes/deslocador32.h"
 #include "./componentes/somadorEnderecos.h"
+#include "./componentes/muxBranch.h"
+#include "./componentes/muxJump.h"
+#include "./componentes/unidadeControle.h"
+#include "./componentes/memoriaDados.h"
+
+#include <iomanip>
 
 SC_MODULE(MIPS_Simplificado) {
     // Portas principais
@@ -43,16 +49,28 @@ SC_MODULE(MIPS_Simplificado) {
 
     sc_signal<sc_int<32>> pc_add_offset;
 
-    sc_signal<sc_uint<32>> write_data_reg;
-    sc_signal<sc_uint<32>> read_data_1;
-    sc_signal<sc_uint<32>> read_data_2;
+    sc_signal<sc_int<32>> write_data_reg;
+    sc_signal<sc_int<32>> read_data_1;
+    sc_signal<sc_int<32>> read_data_2;
+
+    sc_signal<sc_int<32>> output_mux_ula;
 
     sc_signal<sc_uint<4>> alu_control;
+    sc_signal<sc_int<32>> ula_result;
+    sc_signal<sc_int<32>> read_data;
 
     // Sinais de controle
     sc_signal<bool> reg_dst;
     sc_signal<bool> reg_write;
     sc_signal<sc_uint<2>> alu_op;
+    sc_signal<bool> alu_src;
+    sc_signal<bool> jump;
+    sc_signal<bool> branch;
+    sc_signal<bool> mem_read;
+    sc_signal<bool> mem_to_reg;
+    sc_signal<bool> mem_write;
+    sc_signal<bool> zero;
+
 
     // Componentes
     PC* pc;
@@ -60,14 +78,20 @@ SC_MODULE(MIPS_Simplificado) {
     Decodificador* decod;
     Mux<5>* mux_regdst;
     Adder* adder_pc;
-    AdderAddress* adder_endereco;
+    //AdderAddress* adder_endereco;
     RegisterFile* regs;
     SignExtend* signE;
-    //ALU* ula;
+    ALU* ula;
     ALUControl* ulaControle;
-    //Mux<32>* mux_ula;
+    ControlUnit* parteOperativa;
+   // MuxBranch<32>* mux_somador_endereco;
+    //MuxJump<32>* mux_jump_endereco;
+    Mux<32, sc_int<32>>* mux_ula;
+    Mux<32, sc_int<32>>* mux_saida_ula;
+
     Shifter_26to28* deslocador26to32;
     Shifter_32b* deslocador32;
+    DataMemory* memoriaDados;
 
     SC_CTOR(MIPS_Simplificado) {
         // Instanciando componentes
@@ -76,14 +100,19 @@ SC_MODULE(MIPS_Simplificado) {
         decod = new Decodificador("DECOD");
         mux_regdst = new Mux<5>("MUX_REGDST");
         adder_pc = new Adder("ADDER_PC");
-        adder_endereco = new AdderAddress("ADDER_ENDERECO");
+        //adder_endereco = new AdderAddress("ADDER_ENDERECO");
         regs = new RegisterFile("BANCO_REGISTRADORES");
         signE = new SignExtend("EXTENSOR_SINAL");
-        //ula = new ALU("ULA");
+        ula = new ALU("ULA");
         ulaControle = new ALUControl("CONTROLE_ULA");
-        //mux_ula = new Mux<32>("MUX_ULA");
+        //mux_somador_endereco = new MuxBranch<32>("MUX_SOMA_ENDERECO");
+        mux_ula = new Mux<32, sc_int<32>>("MUX_ULA");
+        mux_saida_ula = new Mux<32, sc_int<32>>("MUX_SAIDA_ULA");
+        //mux_jump_endereco = new MuxJump<32>("MUX_JUMP");
         deslocador26to32 = new Shifter_26to28("DESLOCADOR_26_TO_32");
         deslocador32 = new Shifter_32b("DESLOCADOR_32");
+        parteOperativa = new ControlUnit("PARTE_OPERATIVA");
+        memoriaDados = new DataMemory("MEMORIA_DE_DADOS");
 
         // Constante 4
         const_four.write(4);
@@ -108,6 +137,19 @@ SC_MODULE(MIPS_Simplificado) {
         decod->funct(funct);
         decod->jump_address(jump_addr_raw);
 
+        // Parte operativa 
+        parteOperativa->clk(clk);
+        parteOperativa->opcode(opcode);
+        parteOperativa->reg_dst(reg_dst);
+        parteOperativa->reg_write(reg_write);
+        parteOperativa->alu_op(alu_op);
+        parteOperativa->alu_src(alu_src);
+        parteOperativa->mem_write(mem_write);
+        parteOperativa->jump(jump);
+        parteOperativa->mem_read(mem_read);
+        parteOperativa->mem_to_reg(mem_to_reg);
+        parteOperativa->branch(branch);
+
         // Adição de PC + 4
         adder_pc->a(pc_out);
         adder_pc->b(const_four);
@@ -129,11 +171,14 @@ SC_MODULE(MIPS_Simplificado) {
         deslocador32->output(extended_signal_add);
 
         // Somador endereços
-        adder_endereco->a(pc_plus4);
-        adder_endereco->b(extended_signal_add);
-        adder_endereco->sum(pc_add_offset);
+        //adder_endereco->a(pc_plus4);
+        //adder_endereco->b(extended_signal_add);
+        //adder_endereco->sum(pc_add_offset);
 
         // Mux offset com PC
+        //mux_somador_endereco->pc_plus4(pc_plus4);
+        //mux_somador_endereco->branch_target(pc_add_offset);
+        //mux_somador_endereco->sel();
 
         // ULA controle
         ulaControle->alu_op(alu_op);
@@ -146,9 +191,6 @@ SC_MODULE(MIPS_Simplificado) {
         mux_regdst->sel(reg_dst);
         mux_regdst->output(write_reg);
 
-        // Inicializa a entrada com valor padrão para testes
-        write_data_reg.write(0xDEADBEEF);
-
         // Banco de registradores
         regs->clk(clk);
         regs->read_reg1(rs);
@@ -156,17 +198,43 @@ SC_MODULE(MIPS_Simplificado) {
         regs->write_reg(write_reg);
         regs->write_data(write_data_reg);
         regs->reg_write(reg_write);
-
+        // Saida do banco
         regs->read_data1(read_data_1);
         regs->read_data2(read_data_2);
+
+        // Mux ULA
+        mux_ula->input0(read_data_2);
+        mux_ula->input1(extended_signal);
+        mux_ula->sel(alu_src);
+        mux_ula->output(output_mux_ula);
+
+        // ULA
+        ula->a(read_data_1);
+        ula->b(output_mux_ula);
+        ula->alu_control(alu_control);
+        ula->zero(zero);
+        ula->result(ula_result);
+
+        // Memoria de dados
+        memoriaDados->address(ula_result);
+        memoriaDados->write_data(read_data_2);
+        memoriaDados->mem_read(mem_read);
+        memoriaDados->mem_write(mem_write);
+        memoriaDados->read_data(read_data);
+
+        //Mux saida dados
+        mux_saida_ula->input0(ula_result);
+        mux_saida_ula->input1(read_data);
+        mux_saida_ula->sel(mem_to_reg);
+        mux_saida_ula->output(write_data_reg);
 
         // Atualização de sinais derivados
         SC_METHOD(update_signals);
         sensitive << clk.pos();
 
         // Depuração
-        SC_METHOD(show_debug);
-        sensitive << clk.pos();
+        //SC_METHOD(show_debug);
+        //sensitive << clk.pos();
     }
 
     ~MIPS_Simplificado() {
@@ -180,32 +248,15 @@ SC_MODULE(MIPS_Simplificado) {
 
 private:
     void update_signals() {
-        reg_dst.write(opcode.read() == 0);
-        pc_next.write(pc_plus4.read());
-        // Ativa RegWrite para: R-type (opcode=0), lw (0x23), addi (0x08), etc.
-        reg_write.write(
-            opcode.read() == 0 ||    // R-type
-            opcode.read() == 0x23 || // lw
-            opcode.read() == 0x08    // addi
-        );
-    }
-
-    void show_debug() {
-        debug_pc.write(pc_out.read());
-        debug_instruction.write(instruction.read());
-        
-        cout << "---------------------------" << endl;
-        cout << "Ciclo @ " << sc_time_stamp() << endl;
-        cout << "PC: 0x" << hex << pc_out.read() << endl;
-        cout << "Instr: 0x" << hex << instruction.read() << endl;
-        cout << "Opcode: 0x" << hex << opcode.read() << endl;
-        cout << "rs: $" << dec << rs.read() << "\trt: $" << rt.read() << "\trd: $" << rd.read() << endl;
-        cout << "RegWrite: " << reg_write.read() << " WriteReg: $" << dec << write_reg.read() << endl;
-        cout << "WriteData: 0x" << hex << write_data_reg.read() << endl;
+        if (!reset.read()) {
+            // Avança o PC no primeiro ciclo de cada instrução
+            pc_next.write(pc_plus4.read());
+        }
     }
     
 public: 
-    sc_uint<32> registers[32]; 
+    sc_int<32> registers[32]; 
+    sc_int<32> mem[32]; 
 
     void load_program(const std::vector<uint32_t>& instructions) {
         for (auto instr : instructions) {
@@ -214,12 +265,69 @@ public:
     }
 
     void load_instruction(uint32_t instruction) {
+        // Verificação de valor máximo
+        if (instruction > 0xFFFFFFFF) {
+            std::cerr << "ERRO: Instrução excede 32 bits: 0x"
+                    << std::hex << instruction << std::endl;
+            return;
+        }
         imem->add_instruction(instruction);
     }
 
     void visualization_registers(){
         regs->dump_registers(registers);
     }
+
+    void visualization_memory(){
+        memoriaDados->dump_memory(mem);
+    }
+
+    void debug_execution() {
+        using std::hex;
+        using std::dec;
+        using std::setw;
+        using std::setfill;
+        using std::cout;
+        using std::endl;
+
+        cout << "\n═══════════════════════════════════════" << endl;
+        cout << " Ciclo @ " << sc_time_stamp() << endl;
+        cout << " PC: 0x" << hex << setw(8) << setfill('0') << pc_out.read() << endl;
+        
+        // Decodificação da instrução
+        cout << "\n[INSTRUÇÃO]" << endl;
+        cout << " 0x" << setw(8) << setfill('0') << instruction.read() << " | ";
+        switch(opcode.read()) {
+            case 0x08: cout << "addi $" << dec << rt.read() << ", $" << rs.read() 
+                            << ", 0x" << imm.read(); break;
+            case 0x00: cout << "R-type: funct 0x" << hex << funct.read(); break;
+            default:   cout << "Instrução não identificada";
+        }
+        
+        // Sinais de controle
+        cout << "\n\n[CONTROLE]" << endl;
+        cout << " RegDst=" << reg_dst.read() << " RegWrite=" << reg_write.read()
+            << " ALUSrc=" << alu_src.read() << " ALUOp=" << alu_op.read() << endl;
+        cout << " Branch=" << branch.read() << " Jump=" << jump.read()
+            << " MemRead=" << mem_read.read() << " MemWrite=" << mem_write.read() << endl;
+
+        // Estado da ULA
+        cout << "\n[ULA]" << endl;
+        cout << " A=0x" << setw(8) << setfill('0') << read_data_1.read() 
+            << " B=0x" << setw(8) << output_mux_ula.read() 
+            << " Ctrl=0x" << alu_control.read() << endl;
+        cout << " Result=0x" << setw(8) << ula_result.read() 
+            << " Zero=" << zero.read() << endl;
+
+        // Estado dos registradores
+        cout << "\n[REGISTRADORES]" << endl;
+        cout << "Clock: " << clk.read() << endl;
+        cout << " Destino: $" << dec << write_reg.read() 
+            << " Valor: 0x" << hex << setw(8) << setfill('0') << write_data_reg.read() << endl;
+        cout << " $1=0x" << setw(8) << registers[1] 
+            << " $2=0x" << setw(8) << registers[2] << endl;
+    }
+
 };
 
 #endif // MIPS_SIMPLIFICADO_H

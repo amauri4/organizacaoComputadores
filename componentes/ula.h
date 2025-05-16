@@ -2,16 +2,16 @@
 
 SC_MODULE(ALU) {
     // Portas de entrada/saída (mantidas iguais)
-    sc_in<sc_uint<32>> a, b;
-    sc_in<sc_uint<4>> alu_control;
-    sc_out<sc_uint<32>> result;
+    sc_in<sc_int<32>> a, b;         
+    sc_in<sc_uint<4>> alu_control;   
+    sc_out<sc_int<32>> result; 
     sc_out<bool> zero;
     
     void alu_process() {
-        sc_uint<32> a_val = a.read();
-        sc_uint<32> b_val = b.read();
+        sc_int<32> a_val = a.read();
+        sc_int<32> b_val = b.read();
         sc_uint<4> control = alu_control.read();
-        sc_uint<32> res = 0;
+        sc_int<32> res = 0;
         bool z = false;
         
         switch(control) {
@@ -58,8 +58,8 @@ SC_MODULE(ALU) {
     SC_CTOR(ALU) {
         SC_METHOD(alu_process);
         sensitive << a << b << alu_control;
-        SC_METHOD(debug);
-        sensitive << result << zero;
+        //SC_METHOD(debug);
+        //sensitive << result << zero;
         dont_initialize();
     }
     
