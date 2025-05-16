@@ -13,11 +13,17 @@ SC_MODULE(RegisterFile) {
     void read() {
         read_data1.write(registers[read_reg1.read()]);
         read_data2.write(registers[read_reg2.read()]);
+        
+        cout << "REG READ @ " << sc_time_stamp() 
+        << " | $" << read_reg1.read() << "=0x" << hex << registers[read_reg1.read()]
+        << " | $" << read_reg2.read() << "=0x" << hex << registers[read_reg2.read()] << endl;
     }
     
     void write() {
         if (reg_write.read() && write_reg.read() != 0 && clk.posedge()) { // $zero não pode ser escrito
             registers[write_reg.read()] = write_data.read();
+            cout << "REG WRITE @ " << sc_time_stamp() 
+                 << " | $" << write_reg.read() << "=0x" << hex << write_data.read() << endl;
         }
     }
 

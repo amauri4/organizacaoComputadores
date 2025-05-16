@@ -20,6 +20,7 @@
 #include "./componentes/memoriaDados.h"
 
 #include <iomanip>
+#include <sstream>
 
 SC_MODULE(MIPS_Simplificado) {
     // Portas principais
@@ -40,9 +41,8 @@ SC_MODULE(MIPS_Simplificado) {
     sc_signal<sc_uint<32>> const_four;
     sc_signal<sc_uint<5>> write_reg;
     sc_signal<sc_uint<26>> jump_addr_raw;
-    sc_signal<sc_uint<28>> jump_addr_shifted;
     sc_signal<sc_uint<32>> jump_target;
-    
+    sc_signal<sc_uint<4>>pc_bits;
     sc_signal<sc_int<32>> extended_signal;
 
     sc_signal<sc_int<32>> extended_signal_add;
@@ -54,6 +54,11 @@ SC_MODULE(MIPS_Simplificado) {
     sc_signal<sc_int<32>> read_data_2;
 
     sc_signal<sc_int<32>> output_mux_ula;
+    sc_signal<sc_int<32>> output_mux_offset_pc;
+
+    // DEBUG JUMP
+    sc_signal<sc_uint<4>>pc_bits_debug;
+    sc_signal<sc_uint<32>>pc_upper_32_debug;
 
     sc_signal<sc_uint<4>> alu_control;
     sc_signal<sc_int<32>> ula_result;
@@ -71,6 +76,7 @@ SC_MODULE(MIPS_Simplificado) {
     sc_signal<bool> mem_write;
     sc_signal<bool> zero;
 
+    sc_signal<bool> branch_taken;
 
     // Componentes
     PC* pc;
@@ -78,18 +84,18 @@ SC_MODULE(MIPS_Simplificado) {
     Decodificador* decod;
     Mux<5>* mux_regdst;
     Adder* adder_pc;
-    //AdderAddress* adder_endereco;
+    AdderAddress* adder_endereco;
     RegisterFile* regs;
     SignExtend* signE;
     ALU* ula;
     ALUControl* ulaControle;
     ControlUnit* parteOperativa;
-   // MuxBranch<32>* mux_somador_endereco;
-    //MuxJump<32>* mux_jump_endereco;
+    MuxBranch<32>* mux_somador_endereco;
+    MuxJump<32>* mux_jump_endereco;
     Mux<32, sc_int<32>>* mux_ula;
     Mux<32, sc_int<32>>* mux_saida_ula;
 
-    Shifter_26to28* deslocador26to32;
+    Shifter_26to32* deslocador26to32;
     Shifter_32b* deslocador32;
     DataMemory* memoriaDados;
 
@@ -100,16 +106,16 @@ SC_MODULE(MIPS_Simplificado) {
         decod = new Decodificador("DECOD");
         mux_regdst = new Mux<5>("MUX_REGDST");
         adder_pc = new Adder("ADDER_PC");
-        //adder_endereco = new AdderAddress("ADDER_ENDERECO");
+        adder_endereco = new AdderAddress("ADDER_ENDERECO");
         regs = new RegisterFile("BANCO_REGISTRADORES");
         signE = new SignExtend("EXTENSOR_SINAL");
         ula = new ALU("ULA");
         ulaControle = new ALUControl("CONTROLE_ULA");
-        //mux_somador_endereco = new MuxBranch<32>("MUX_SOMA_ENDERECO");
+        mux_somador_endereco = new MuxBranch<32>("MUX_SOMA_ENDERECO");
         mux_ula = new Mux<32, sc_int<32>>("MUX_ULA");
         mux_saida_ula = new Mux<32, sc_int<32>>("MUX_SAIDA_ULA");
-        //mux_jump_endereco = new MuxJump<32>("MUX_JUMP");
-        deslocador26to32 = new Shifter_26to28("DESLOCADOR_26_TO_32");
+        mux_jump_endereco = new MuxJump<32>("MUX_JUMP");
+        deslocador26to32 = new Shifter_26to32("DESLOCADOR_26_TO_32");
         deslocador32 = new Shifter_32b("DESLOCADOR_32");
         parteOperativa = new ControlUnit("PARTE_OPERATIVA");
         memoriaDados = new DataMemory("MEMORIA_DE_DADOS");
@@ -156,11 +162,10 @@ SC_MODULE(MIPS_Simplificado) {
         adder_pc->sum(pc_plus4);
 
         // Deslocador para cálculo do Jump
-        deslocador26to32->input(jump_addr_raw);
-        deslocador26to32->output(jump_addr_shifted);
-
-        // Cálculo do endereço final (PC+4[31..28] || jump_addr_shifted)
-        jump_target.write((pc_plus4.read().range(31, 28), jump_addr_shifted.read()));
+        pc_bits = pc_out.read().range(31,28);
+        deslocador26to32->pc_high(pc_bits);
+        deslocador26to32->instr_index(jump_addr_raw);
+        deslocador26to32->jump_address(jump_target); 
 
         // Extensor de sinal
         signE->input(imm);
@@ -171,14 +176,9 @@ SC_MODULE(MIPS_Simplificado) {
         deslocador32->output(extended_signal_add);
 
         // Somador endereços
-        //adder_endereco->a(pc_plus4);
-        //adder_endereco->b(extended_signal_add);
-        //adder_endereco->sum(pc_add_offset);
-
-        // Mux offset com PC
-        //mux_somador_endereco->pc_plus4(pc_plus4);
-        //mux_somador_endereco->branch_target(pc_add_offset);
-        //mux_somador_endereco->sel();
+        adder_endereco->a(pc_plus4);
+        adder_endereco->b(extended_signal_add);
+        adder_endereco->sum(pc_add_offset);
 
         // ULA controle
         ulaControle->alu_op(alu_op);
@@ -215,7 +215,20 @@ SC_MODULE(MIPS_Simplificado) {
         ula->zero(zero);
         ula->result(ula_result);
 
+        // Mux offset com PC
+        mux_somador_endereco->pc_plus4(pc_plus4);
+        mux_somador_endereco->branch_target(pc_add_offset);
+        mux_somador_endereco->branch_taken(branch_taken); // decisao de seletor de branch
+        mux_somador_endereco->out(output_mux_offset_pc);
+
+        // Mux jump 
+        mux_jump_endereco->branch_mux_out(output_mux_offset_pc);
+        mux_jump_endereco->jump_target(jump_target);
+        mux_jump_endereco->jump_taken(jump);
+        mux_jump_endereco->pc_next(pc_next);
+
         // Memoria de dados
+        memoriaDados->clk(clk);
         memoriaDados->address(ula_result);
         memoriaDados->write_data(read_data_2);
         memoriaDados->mem_read(mem_read);
@@ -229,8 +242,13 @@ SC_MODULE(MIPS_Simplificado) {
         mux_saida_ula->output(write_data_reg);
 
         // Atualização de sinais derivados
-        SC_METHOD(update_signals);
-        sensitive << clk.pos();
+        SC_METHOD(update_branch_decision);
+        sensitive << branch << zero;
+        dont_initialize();
+
+        // SC_METHOD(update_pc);
+        // sensitive << clk.pos();
+        // dont_initialize();
 
         // Depuração
         //SC_METHOD(show_debug);
@@ -247,12 +265,17 @@ SC_MODULE(MIPS_Simplificado) {
     }
 
 private:
-    void update_signals() {
-        if (!reset.read()) {
-            // Avança o PC no primeiro ciclo de cada instrução
-            pc_next.write(pc_plus4.read());
-        }
+    void update_branch_decision() {
+        branch_taken.write(branch.read() && zero.read());
     }
+
+    // void update_pc() {
+    //     if (reset.read()) {
+    //         pc_next.write(0);
+    //     } else if (clk.posedge()) {
+    //         // O PC será atualizado automaticamente pela saída do mux_jump_endereco
+    //     }
+    // }
     
 public: 
     sc_int<32> registers[32]; 
@@ -298,9 +321,26 @@ public:
         cout << "\n[INSTRUÇÃO]" << endl;
         cout << " 0x" << setw(8) << setfill('0') << instruction.read() << " | ";
         switch(opcode.read()) {
-            case 0x08: cout << "addi $" << dec << rt.read() << ", $" << rs.read() 
-                            << ", 0x" << imm.read(); break;
-            case 0x00: cout << "R-type: funct 0x" << hex << funct.read(); break;
+            case 0x00: // R-type
+                cout << "R-type: ";
+                switch(funct.read()) {
+                    case 0x20: cout << "add"; break;
+                    case 0x22: cout << "sub"; break;
+                    case 0x24: cout << "and"; break;
+                    case 0x25: cout << "or"; break;
+                    case 0x2A: cout << "slt"; break;
+                    case 0x08: cout << "jr"; break;
+                    default: cout << "funct 0x" << hex << funct.read();
+                }
+                cout << " $" << dec << rd.read() << ", $" << rs.read() << ", $" << rt.read();
+                break;
+            case 0x08: cout << "addi $" << dec << rt.read() << ", $" << rs.read() << ", 0x" << hex << imm.read(); break;
+            case 0x04: cout << "beq $" << dec << rs.read() << ", $" << rt.read() << ", 0x" << hex << imm.read(); break;
+            case 0x05: cout << "bne $" << dec << rs.read() << ", $" << rt.read() << ", 0x" << hex << imm.read(); break;
+            case 0x02: cout << "j 0x" << hex << jump_addr_raw.read(); break;
+            case 0x03: cout << "jal 0x" << hex << jump_addr_raw.read(); break;
+            case 0x23: cout << "lw $" << dec << rt.read() << ", 0x" << hex << imm.read() << "($" << rs.read() << ")"; break;
+            case 0x2B: cout << "sw $" << dec << rt.read() << ", 0x" << hex << imm.read() << "($" << rs.read() << ")"; break;
             default:   cout << "Instrução não identificada";
         }
         
@@ -310,6 +350,34 @@ public:
             << " ALUSrc=" << alu_src.read() << " ALUOp=" << alu_op.read() << endl;
         cout << " Branch=" << branch.read() << " Jump=" << jump.read()
             << " MemRead=" << mem_read.read() << " MemWrite=" << mem_write.read() << endl;
+
+        // Informações de desvio
+        if (branch.read() || jump.read()) {
+            cout << "\n[CONTROLE DE FLUXO]" << endl;
+            if (branch.read()) {
+                cout << " Branch: " << (branch_taken.read() ? "TOMADO" : "NÃO TOMADO") << endl;
+                cout << "  Offset: 0x" << hex << extended_signal.read() << endl;
+                cout << "  Alvo: 0x" << pc_add_offset.read() << endl;
+            }
+            if (jump.read()) {
+                cout << " Jump: TOMADO" << endl;
+                cout << "  Alvo: 0x" << jump_target.read() << endl;
+                cout << "Jump 26 bits:  0x" << jump_addr_raw << endl;
+                cout << "Jump 32 bits:  0x" << jump_target << endl;
+                cout << "PC next:  0x" << pc_next << endl;
+                cout << "PC out: 0x" << pc_out << endl;
+                // DEBUG OBRIGATÓRIO
+                cout << "DEBUG JUMP CALCULATION:" << endl;
+                cout << "PC: 0x" << hex << pc_out.read() << endl;
+                cout << "PC upper (4 bits): 0x" << hex << pc_bits_debug << endl;
+                cout << "PC upper (32 bits): 0x" << hex << pc_upper_32_debug << endl;
+                cout << "Jump shifted: 0x" << hex << jump_target.read() << endl;
+
+                if (opcode.read() == 0x03) { // JAL
+                    cout << "  Endereço de retorno: 0x" << (pc_out.read() + 8) << endl;
+                }
+            }
+        }
 
         // Estado da ULA
         cout << "\n[ULA]" << endl;
@@ -321,11 +389,29 @@ public:
 
         // Estado dos registradores
         cout << "\n[REGISTRADORES]" << endl;
-        cout << "Clock: " << clk.read() << endl;
+        cout << " Clock: " << clk.read() << endl;
         cout << " Destino: $" << dec << write_reg.read() 
             << " Valor: 0x" << hex << setw(8) << setfill('0') << write_data_reg.read() << endl;
-        cout << " $1=0x" << setw(8) << registers[1] 
-            << " $2=0x" << setw(8) << registers[2] << endl;
+        
+        // Mostra registradores importantes
+        cout << " $1=0x" << setw(8) << registers[0] 
+            << " $2=0x" << setw(8) << registers[1] 
+            << " $5=0x" << setw(8) << registers[5] 
+            << " $6=0x" << setw(8) << registers[6] 
+            << " $31=0x" << setw(8) << registers[31] << endl;
+
+        // Estado da memória (apenas endereços relevantes)
+        if (mem_read.read() || mem_write.read()) {
+            cout << "\n[MEMÓRIA]" << endl;
+            uint32_t addr = ula_result.read() & 0xFFFFFFFC;
+            cout << " Acesso a 0x" << hex << setw(8) << setfill('0') << addr;
+            if (mem_read.read()) {
+                cout << " | Lendo: 0x" << read_data.read() << endl;
+            }
+            if (mem_write.read()) {
+                cout << " | Escrevendo: 0x" << read_data_2.read() << endl;
+            }
+        }
     }
 
 };
