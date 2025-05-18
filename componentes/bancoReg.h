@@ -88,7 +88,7 @@ SC_MODULE(RegisterFile) {
         dont_initialize();
         
         SC_METHOD(write);
-        sensitive << clk.neg() << reg_write << write_reg << write_data;
+        sensitive << clk.neg(); // << reg_write << write_reg << write_data
         dont_initialize();
     }
 };

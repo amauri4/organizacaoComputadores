@@ -101,6 +101,7 @@ int sc_main(int argc, char* argv[]) {
     };
 
     vector<uint32_t> teste_memoria = {
+                 0x00000000,
         /*0x00*/ 0x20060011, // addi $6, $0, 0x11    | $6 = 0x11
         /*0x04*/ 0xAC060020, // sw $6, 0x20($0)      | Mem[0x20] = 0x11
         /*0x08*/ 0x8C080020, // lw $8, 0x20($0)      | $8 = 0x11

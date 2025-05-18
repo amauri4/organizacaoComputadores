@@ -28,11 +28,10 @@ SC_MODULE(MIPS_Pipelined)
     sc_in<bool> reset;
 
     // Sinais de debug
-    //sc_out<sc_uint<32>> debug_pc;
-    //sc_out<sc_uint<32>> debug_instruction;
+    // sc_out<sc_uint<32>> debug_pc;
+    // sc_out<sc_uint<32>> debug_instruction;
     sc_signal<sc_uint<32>> const_four;
-    sc_signal<sc_int<32>> ula_out;
-
+    sc_signal<sc_int<32>> alu_b_before_forward, alu_b_after_forward;;
     // SINAIS DE CONTROLE
 
     sc_signal<bool> ctrl_reg_dst;
@@ -44,6 +43,8 @@ SC_MODULE(MIPS_Pipelined)
     sc_signal<bool> ctrl_mem_write;
     sc_signal<bool> ctrl_alu_src;
     sc_signal<bool> ctrl_reg_write;
+    sc_signal<bool> stall_store_signal;
+    sc_signal<bool> mem_write_stall;
 
     //---------------------------
     // Registradores de Pipeline
@@ -54,6 +55,7 @@ SC_MODULE(MIPS_Pipelined)
     {
         sc_signal<sc_uint<32>> pc_plus4;
         sc_signal<sc_uint<32>> instruction;
+        sc_signal<bool> if_id_write;
 
         void reset()
         {
@@ -68,6 +70,7 @@ SC_MODULE(MIPS_Pipelined)
         // Controle
         sc_signal<bool> reg_write, mem_to_reg, branch, mem_read, mem_write, alu_src, reg_dst;
         sc_signal<sc_uint<2>> alu_op;
+        sc_signal<sc_uint<6>> funct;
 
         // Dados
         sc_signal<sc_uint<32>> pc_plus4;
@@ -77,6 +80,7 @@ SC_MODULE(MIPS_Pipelined)
 
         void reset()
         {
+            funct.write(0);
             reg_write.write(0);
             mem_to_reg.write(0);
             branch.write(0);
@@ -174,6 +178,8 @@ SC_MODULE(MIPS_Pipelined)
     sc_signal<bool> branch_taken;
     sc_signal<sc_uint<32>> next_pc;
 
+    sc_signal<sc_int<32>> read_data_mem;
+
     // Sinais de forwarding
     sc_signal<sc_uint<2>> forwardA, forwardB;
 
@@ -236,12 +242,13 @@ SC_MODULE(MIPS_Pipelined)
 
         const_four.write(4);
         // Conexões do estágio IF
-        pc->clk(clk);
         pc->reset(reset);
         pc->next_addr(pc_in);
+        pc->enable(pc_write);
         pc->current_addr(pc_out);
 
         imem->address(pc_out);
+        imem->clk(clk);
         imem->instruction(instruction);
 
         pc_adder->a(pc_out);
@@ -287,22 +294,17 @@ SC_MODULE(MIPS_Pipelined)
         mux_regdst->sel(id_ex.reg_dst);
         mux_regdst->output(write_reg);
 
-        // Forwarding muxes
-        SC_METHOD(set_alu_inputs);
-        sensitive << forwardA << forwardB << id_ex.read_data1 << id_ex.read_data2
-                  << ex_mem.alu_result << write_data;
-
-        mux_alu_src->input0(alu_b);
+        mux_alu_src->input0(id_ex.read_data2);
         mux_alu_src->input1(id_ex.imm_extended);
         mux_alu_src->sel(id_ex.alu_src);
-        mux_alu_src->output(ula_out);
+        mux_alu_src->output(alu_b_before_forward);
 
         alu_ctrl->alu_op(id_ex.alu_op);
-        alu_ctrl->funct(funct);
+        alu_ctrl->funct(id_ex.funct);
         alu_ctrl->alu_control(alu_control);
 
         ula->a(alu_a_forward);
-        ula->b(ula_out);
+        ula->b(alu_b_after_forward); /// PROBLEMA COM A FOWARD UNIT
         ula->alu_control(alu_control);
         ula->zero(alu_zero);
         ula->result(alu_result);
@@ -314,13 +316,14 @@ SC_MODULE(MIPS_Pipelined)
         branch_adder->b(extended_imm_shifted);
         branch_adder->sum(branch_target);
 
+        mem_write_stall = (ex_mem.mem_write && !stall_store_signal);
         // Conexões do estágio MEM
         dmem->clk(clk);
         dmem->address(ex_mem.alu_result);
         dmem->write_data(ex_mem.write_data);
         dmem->mem_read(ex_mem.mem_read);
-        dmem->mem_write(ex_mem.mem_write);
-        dmem->read_data(mem_wb.read_data);
+        dmem->mem_write(mem_write_stall);
+        dmem->read_data(read_data_mem);
 
         branch_taken = ex_mem.branch.read() && ex_mem.zero.read();
 
@@ -329,6 +332,7 @@ SC_MODULE(MIPS_Pipelined)
         mux_pc_branch->sel(branch_taken);
         mux_pc_branch->output(next_pc);
 
+        // SALVAR O PC_BITS E O JUMP_ADDR
         jump_shifter->pc_high(pc_upper_bits);
         jump_shifter->instr_index(jump_addr_raw);
         jump_shifter->jump_address(jump_target);
@@ -351,6 +355,7 @@ SC_MODULE(MIPS_Pipelined)
         forwarding_unit->mem_wb_rd(mem_wb.write_reg);
         forwarding_unit->id_ex_rs(id_ex.rs);
         forwarding_unit->id_ex_rt(id_ex.rt);
+        // Saidas 
         forwarding_unit->forwardA(forwardA);
         forwarding_unit->forwardB(forwardB);
 
@@ -359,6 +364,8 @@ SC_MODULE(MIPS_Pipelined)
         hazard_unit->id_ex_rt(id_ex.rt);
         hazard_unit->if_id_rs(rs);
         hazard_unit->if_id_rt(rt);
+        hazard_unit->id_ex_mem_write(id_ex.mem_write);
+        // Saidas
         hazard_unit->pc_write(pc_write);
         hazard_unit->if_id_write(if_id_write);
         hazard_unit->control_mux(control_mux);
@@ -376,6 +383,13 @@ SC_MODULE(MIPS_Pipelined)
         SC_METHOD(update_mem_wb);
         sensitive << clk.pos();
 
+        SC_METHOD(check_memory_write);
+        sensitive << clk.pos();
+
+        // Forwarding muxes
+        SC_METHOD(set_alu_inputs);
+        sensitive << forwardA << forwardB << id_ex.read_data1 << id_ex.read_data2
+                  << ex_mem.alu_result << write_data << alu_b_before_forward;
     }
 
     ~MIPS_Pipelined()
@@ -405,8 +419,19 @@ SC_MODULE(MIPS_Pipelined)
 private:
     sc_signal<sc_int<32>> alu_a_forward, alu_b_forward;
 
+    void check_memory_write()
+    {
+        if (ex_mem.mem_write.read() && !reset.read())
+        {
+            cout << "Attempting to write to memory @ " << sc_time_stamp()
+                 << " | Addr: 0x" << hex << ex_mem.alu_result.read()
+                 << " | Data: 0x" << ex_mem.write_data.read() << endl;
+        }
+    }
+
     void set_alu_inputs()
     {
+
         // Forwarding para entrada A da ULA
         switch (forwardA.read())
         {
@@ -421,18 +446,40 @@ private:
             break;
         }
 
+        // RESOLVENDO O FOWARD AQUIIIIII
         // Forwarding para entrada B da ULA
         switch (forwardB.read())
         {
         case 0:
-            alu_b_forward.write(id_ex.read_data2);
+            alu_b_after_forward.write(alu_b_before_forward);
             break;
         case 1:
-            alu_b_forward.write(ex_mem.alu_result);
+            alu_b_after_forward.write(ex_mem.alu_result);
             break;
         case 2:
-            alu_b_forward.write(write_data);
+            alu_b_after_forward.write(write_data);
             break;
+        }
+
+        if (id_ex.mem_write.read())
+        {
+            cout << "STORE DATA FLOW @ " << sc_time_stamp() << endl;
+            cout << "  RT register: $" << id_ex.rt.read() << endl;
+            cout << "  Value from ID/EX: 0x" << hex << id_ex.read_data2.read() << endl;
+            cout << "  ForwardB selector: " << forwardB.read() << endl;
+            cout << "  Forwarded value: 0x" << alu_b_forward.read() << endl;
+        }
+
+        if (ex_mem.mem_write.read())
+        {
+
+            cout << "\n" << "SINAIS" << "| REGISTRADOR FONTE NO ID" << rt << "REGISTRADOR DESTINO EX" << id_ex.rt << " | ESCRITA REGISTRADO " 
+                << id_ex.reg_write << "\n| DESTINO MEMORIA" << ex_mem.write_reg << " | ESCRITA MEMORIA "
+                << ex_mem.reg_write <<"\n\n";
+
+            cout << "STORE OPERATION @ " << sc_time_stamp()
+                 << " | Data to store: 0x" << hex << alu_b_forward.read()
+                 << " | Address: 0x" << alu_result.read() << endl;
         }
     }
 
@@ -451,6 +498,12 @@ private:
 
     void update_id_ex()
     {
+
+        cout << "EX STAGE @ " << sc_time_stamp()
+             << " | ALU Result: 0x" << hex << alu_result.read()
+             << " | Base: 0x" << id_ex.read_data1.read()
+             << " | Offset: 0x" << id_ex.imm_extended.read() << endl;
+
         if (reset.read())
         {
             id_ex.reset();
@@ -466,6 +519,7 @@ private:
             id_ex.alu_src.write(ctrl_alu_src.read());
             id_ex.reg_dst.write(ctrl_reg_dst.read());
             id_ex.alu_op.write(ctrl_alu_op.read());
+            id_ex.funct.write(funct.read());
 
             // Passa os dados
             id_ex.pc_plus4.write(if_id.pc_plus4.read());
@@ -487,6 +541,7 @@ private:
             id_ex.alu_src.write(0);
             id_ex.reg_dst.write(0);
             id_ex.alu_op.write(0);
+            id_ex.funct.write(0);
         }
     }
 
@@ -498,6 +553,14 @@ private:
         }
         else
         {
+
+            if (id_ex.mem_write.read())
+            {
+                cout << "STORE instruction detected in EX/MEM @ " << sc_time_stamp()
+                     << " | Data: 0x" << hex << alu_b_forward.read()
+                     << " | Address: 0x" << alu_result.read() << endl;
+            }
+
             ex_mem.reg_write.write(id_ex.reg_write.read());
             ex_mem.mem_to_reg.write(id_ex.mem_to_reg.read());
             ex_mem.branch.write(id_ex.branch.read());
@@ -512,7 +575,7 @@ private:
             else
             {
                 SC_REPORT_WARNING("Conversion", "Negative address detected");
-                ex_mem.branch_target.write(0); 
+                ex_mem.branch_target.write(0);
             }
 
             ex_mem.zero.write(alu_zero.read());
@@ -533,13 +596,16 @@ private:
             mem_wb.reg_write.write(ex_mem.reg_write.read());
             mem_wb.mem_to_reg.write(ex_mem.mem_to_reg.read());
 
-            mem_wb.read_data.write(dmem->read_data.read());
+            mem_wb.read_data.write(read_data_mem);
             mem_wb.alu_result.write(ex_mem.alu_result.read());
             mem_wb.write_reg.write(ex_mem.write_reg.read());
         }
     }
 
 public:
+    sc_int<32> registers[32];
+    sc_int<32> mem[32];
+
     // Métodos para carregar programa e debug (similares ao original)
     void load_program(const std::vector<uint32_t> &instructions)
     {
@@ -549,9 +615,14 @@ public:
         }
     }
 
-    void debug_execution()
+    void visualization_registers()
     {
-        // Implementação similar à original, adaptada para pipeline
+        regs->dump_registers(registers);
+    }
+
+    void visualization_memory()
+    {
+        dmem->dump_memory(mem);
     }
 };
 

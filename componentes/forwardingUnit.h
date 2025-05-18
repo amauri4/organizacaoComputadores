@@ -4,17 +4,17 @@
 #include <systemc.h>
 
 SC_MODULE(ForwardingUnit) {
-    // Entradas
-    sc_in<bool> ex_mem_reg_write;    // Se vai escrever no registrador no estágio MEM
-    sc_in<bool> mem_wb_reg_write;    // Se vai escrever no registrador no estágio WB
-    sc_in<sc_uint<5>> ex_mem_rd;     // Registrador destino no estágio MEM
-    sc_in<sc_uint<5>> mem_wb_rd;     // Registrador destino no estágio WB
-    sc_in<sc_uint<5>> id_ex_rs;      // Registrador fonte rs no estágio EX
-    sc_in<sc_uint<5>> id_ex_rt;      // Registrador fonte rt no estágio EX
+    // Entradas (mantidas conforme seu código)
+    sc_in<bool> ex_mem_reg_write;    // Indica escrita no estágio MEM
+    sc_in<bool> mem_wb_reg_write;    // Indica escrita no estágio WB
+    sc_in<sc_uint<5>> ex_mem_rd;     // Registrador destino MEM
+    sc_in<sc_uint<5>> mem_wb_rd;     // Registrador destino WB
+    sc_in<sc_uint<5>> id_ex_rs;      // Registrador fonte rs EX
+    sc_in<sc_uint<5>> id_ex_rt;      // Registrador fonte rt EX
     
-    // Saídas
-    sc_out<sc_uint<2>> forwardA;     // Controle para forwarding da entrada A da ULA
-    sc_out<sc_uint<2>> forwardB;     // Controle para forwarding da entrada B da ULA
+    // Saídas (mantidas conforme seu código)
+    sc_out<sc_uint<2>> forwardA;     // Controle para entrada A da ULA
+    sc_out<sc_uint<2>> forwardB;     // Controle para entrada B da ULA
     
     SC_CTOR(ForwardingUnit) {
         SC_METHOD(forward_signals);
@@ -27,27 +27,32 @@ SC_MODULE(ForwardingUnit) {
         // Forwarding para entrada A (rs)
         if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0 && 
             ex_mem_rd.read() == id_ex_rs.read()) {
-            forwardA.write(0b10); // Forward do estágio EX/MEM
+            forwardA.write(0b10); // Prioridade para EX/MEM
         }
         else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0 && 
                 mem_wb_rd.read() == id_ex_rs.read()) {
-            forwardA.write(0b01); // Forward do estágio MEM/WB
+            forwardA.write(0b01); // Fallback para MEM/WB
         }
         else {
             forwardA.write(0b00); // Sem forwarding
         }
         
-        // Forwarding para entrada B (rt)
-        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0 && 
-            ex_mem_rd.read() == id_ex_rt.read()) {
-            forwardB.write(0b10); // Forward do estágio EX/MEM
+        // Forwarding para entrada B (rt) - ATUALIZAÇÃO CRÍTICA
+        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0) {
+            if (ex_mem_rd.read() == id_ex_rt.read()) {
+                forwardB.write(0b10); // Forward EX/MEM
+                cout << "FORWARDING DETECTED: EX/MEM -> $" << id_ex_rt.read() << endl;
+            }
         }
-        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0 && 
-                mem_wb_rd.read() == id_ex_rt.read()) {
-            forwardB.write(0b01); // Forward do estágio MEM/WB
+        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0) {
+            if (mem_wb_rd.read() == id_ex_rt.read()) {
+                forwardB.write(0b01); // Forward MEM/WB
+                cout << "FORWARDING DETECTED: MEM/WB -> $" << id_ex_rt.read() << endl;
+            }
         }
         else {
             forwardB.write(0b00); // Sem forwarding
+            cout << "NO FORWARDING NEEDED for $" << id_ex_rt.read() << endl;
         }
     }
 };

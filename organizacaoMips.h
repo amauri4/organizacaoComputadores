@@ -42,7 +42,6 @@ SC_MODULE(MIPS_Simplificado) {
     // Portas principais
     sc_in_clk clk;
     sc_in<bool> reset;
-    sc_signal<bool> escrita;
 
     // Sinais de depuração
     sc_out<sc_uint<32>> debug_pc;
@@ -152,17 +151,14 @@ SC_MODULE(MIPS_Simplificado) {
         pc->reset(reset);
         pc->clk(clk);
         pc->next_addr(pc_next);
-        pc->escrita_instrucao(escrita);
         pc->current_addr(pc_out);
 
         // Memória de instruções
         imem->address(pc_out);
-        imem->escrita(escrita);
         imem->instruction(instruction);
 
         // Decodificador
         decod->instruction(instruction);
-        decod->escrita(escrita);
         decod->opcode(opcode);
         decod->rs(rs);
         decod->rt(rt);
@@ -218,6 +214,7 @@ SC_MODULE(MIPS_Simplificado) {
         mux_regdst->output(write_reg);
 
         // Banco de registradores
+        regs->clk(clk);
         regs->read_reg1(rs);
         regs->read_reg2(rt);
         regs->write_reg(write_reg);
@@ -253,6 +250,7 @@ SC_MODULE(MIPS_Simplificado) {
         mux_jump_endereco->pc_next(pc_next);
 
         // Memoria de dados
+        memoriaDados->clk(clk);
         memoriaDados->address(ula_result);
         memoriaDados->write_data(read_data_2);
         memoriaDados->mem_read(mem_read);

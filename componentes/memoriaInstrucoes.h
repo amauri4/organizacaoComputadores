@@ -8,6 +8,7 @@
 
 SC_MODULE(InstructionMemory) {
     sc_in<sc_uint<32>> address;
+    sc_in_clk clk;
     sc_out<sc_uint<32>> instruction;
     std::vector<sc_uint<32>> mem;
 
@@ -33,7 +34,7 @@ SC_MODULE(InstructionMemory) {
         sc_uint<32> addr = address.read();
         size_t word_addr = addr >> 2; 
         
-        if ((word_addr < mem.size())) {
+        if ((word_addr < mem.size()) && clk.posedge()) {
             instruction.write(mem[word_addr]);
             std::cout << "\nLENDO INSTRUÇÃO -> " << instruction.read() << "\n";
         } else {
@@ -58,7 +59,7 @@ SC_MODULE(InstructionMemory) {
 
     SC_CTOR(InstructionMemory) {
         SC_METHOD(read_process);
-        sensitive << address;
+        sensitive << clk.pos();
     }
 };
 
