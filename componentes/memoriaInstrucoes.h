@@ -9,7 +9,6 @@
 SC_MODULE(InstructionMemory) {
     sc_in<sc_uint<32>> address;
     sc_out<sc_uint<32>> instruction;
-    
     std::vector<sc_uint<32>> mem;
 
     void add_instruction(uint32_t instr) {
@@ -34,8 +33,9 @@ SC_MODULE(InstructionMemory) {
         sc_uint<32> addr = address.read();
         size_t word_addr = addr >> 2; 
         
-        if (word_addr < mem.size()) {
+        if ((word_addr < mem.size())) {
             instruction.write(mem[word_addr]);
+            std::cout << "\nLENDO INSTRUÇÃO -> " << instruction.read() << "\n";
         } else {
             instruction.write(0x00000000); 
             if (addr != 0) {

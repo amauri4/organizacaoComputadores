@@ -1,5 +1,5 @@
 $date
-     May 16, 2025       16:37:28
+     May 18, 2025       01:38:43
 $end
 
 $version
@@ -33,7 +33,7 @@ $end
 
 $dumpvars
 1aaaaa
-1aaaab
+0aaaab
 b0 aaaac
 b100000000001100000000000010001 aaaad
 b0 aaaae
@@ -52,38 +52,25 @@ $end
 
 #10000
 1aaaaa
-
-#15000
-0aaaaa
-
-#20000
-1aaaaa
-
-#25000
-0aaaaa
-
-#30000
-1aaaaa
-0aaaab
 b100 aaaac
 b10101100000001100000000000100000 aaaad
 b100000 aaaag
 b100000 aaaai
 0aaaak
 
-#35000
+#15000
 0aaaaa
 
-#40000
+#20000
 1aaaaa
 b1000 aaaac
 b10001100000010000000000000100000 aaaad
 1aaaak
 
-#45000
+#25000
 0aaaaa
 
-#50000
+#30000
 1aaaaa
 b1100 aaaac
 b1000000000000000000000000011 aaaad
@@ -93,19 +80,13 @@ b0 aaaai
 0aaaak
 0aaaam
 
-#55000
+#35000
 0aaaaa
 
-#60000
+#40000
 1aaaaa
 
-#65000
+#45000
 0aaaaa
 
-#70000
-1aaaaa
-
-#75000
-0aaaaa
-
-#80000
+#50000

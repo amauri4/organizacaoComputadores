@@ -66,7 +66,7 @@ void print_memory(MIPS_Simplificado& mips, bool show_all = false) {
     }
     
     cout << "╚════════════╩═════════════════════════╝" << endl;
-    cout << "Palavras não-zero: " << dec << count << "/32" << endl << endl;
+    cout << "Palavras não-zero: " << dec << count << "/32" << endl;
 }
 
 // Função para verificar valores com mais detalhes
@@ -81,16 +81,6 @@ void verifica_valor(const string& nome, uint32_t valor, uint32_t esperado) {
 }
 
 int sc_main(int argc, char* argv[]) {
-    // Configuração inicial
-    sc_clock clk("clk", 10, SC_NS, 0.5);
-    sc_signal<bool> reset;
-    sc_signal<sc_uint<32>> debug_pc;
-    sc_signal<sc_uint<32>> debug_instruction;
-    MIPS_Simplificado mips("MIPS");
-    mips.clk(clk);
-    mips.reset(reset);
-    mips.debug_pc(debug_pc);
-    mips.debug_instruction(debug_instruction);
 
     vector<uint32_t> teste_aritmetica = {
         /*0x00*/ 0x20010005, // addi $1, $0, 5       | $1 = 5
@@ -162,7 +152,17 @@ int sc_main(int argc, char* argv[]) {
         /*0x20*/ 0x08000008  // j 0x00000008         | Loop (PC=0x20)
     };
 
-    mips.load_program(teste_memoria);
+    // Configuração inicial
+    sc_signal<bool> reset;
+    sc_signal<sc_uint<32>> debug_pc;
+    sc_signal<sc_uint<32>> debug_instruction;
+
+    sc_clock clk("clk", 10, SC_NS); 
+    MIPS_Simplificado mips("MIPS");
+    mips.clk(clk);
+    mips.reset(reset);
+    mips.debug_pc(debug_pc);
+    mips.debug_instruction(debug_instruction);
 
     // Arquivo de trace para GTKWave
     sc_trace_file *tf = sc_create_vcd_trace_file("mips_trace");
@@ -179,29 +179,17 @@ int sc_main(int argc, char* argv[]) {
     sc_trace(tf, mips.reg_write, "reg_write");
     sc_trace(tf, mips.reg_dst, "reg_dst");
     sc_trace(tf, mips.alu_src, "alu_src");
-
-    // Reset inicial
-    reset.write(true);
-    sc_start(30, SC_NS);
-    reset.write(false);
-    cout << "Reset concluído @ " << sc_time_stamp() << endl;
-
-    int num_ciclos = 5;
-    // Execução passo a passo com verificações detalhada
-    for (int ciclo = 0; ciclo < num_ciclos; ++ciclo) {
-
-        cout << "\n────────── INÍCIO CICLO " << dec << ciclo << " ──────────" << endl;
-
-        mips.debug_execution();
-        sc_start(10, SC_NS); // Avança um ciclo de clock
-
-        cout << "────────── FIM CICLO " << ciclo << " ────────────" << endl;
-        print_registradores(mips);
+    
+    for (int i = 0; i < 5; i++) {
+        if(i == 0){
+             mips.load_program(teste_memoria);
+        }
+        sc_start(10, SC_NS);  // Ciclos completos de 10ns
     }
 
-    cout << "\n=== Estado Final ===" << endl;
+    print_memory(mips);
     print_registradores(mips);
-    print_memory(mips, true);
+
     sc_close_vcd_trace_file(tf);
     return 0;
 }

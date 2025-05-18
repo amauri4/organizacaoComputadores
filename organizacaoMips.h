@@ -22,10 +22,27 @@
 #include <iomanip>
 #include <sstream>
 
+
+struct IF_ID_Register {
+    sc_signal<sc_uint<32>> pc_plus4;
+    sc_signal<sc_uint<32>> instruction;
+    
+    void reset() {
+        pc_plus4.write(0);
+        instruction.write(0);
+    }
+    
+    void update(sc_uint<32> new_pc_plus4, sc_uint<32> new_instruction) {
+        pc_plus4.write(new_pc_plus4);
+        instruction.write(new_instruction);
+    }
+};
+
 SC_MODULE(MIPS_Simplificado) {
     // Portas principais
     sc_in_clk clk;
     sc_in<bool> reset;
+    sc_signal<bool> escrita;
 
     // Sinais de depuração
     sc_out<sc_uint<32>> debug_pc;
@@ -55,6 +72,8 @@ SC_MODULE(MIPS_Simplificado) {
 
     sc_signal<sc_int<32>> output_mux_ula;
     sc_signal<sc_int<32>> output_mux_offset_pc;
+
+    sc_signal<sc_uint<32>> fetched_instruction;
 
     // DEBUG JUMP
     sc_signal<sc_uint<4>>pc_bits_debug;
@@ -99,6 +118,12 @@ SC_MODULE(MIPS_Simplificado) {
     Shifter_32b* deslocador32;
     DataMemory* memoriaDados;
 
+    IF_ID_Register if_id;  
+    
+    // Sinais adicionais
+    sc_signal<bool> flush_pipeline;
+    sc_signal<bool> stall_pipeline;
+
     SC_CTOR(MIPS_Simplificado) {
         // Instanciando componentes
         pc = new PC("PC");
@@ -124,17 +149,20 @@ SC_MODULE(MIPS_Simplificado) {
         const_four.write(4);
 
         // Conectando PC
-        pc->clk(clk);
         pc->reset(reset);
+        pc->clk(clk);
         pc->next_addr(pc_next);
+        pc->escrita_instrucao(escrita);
         pc->current_addr(pc_out);
 
         // Memória de instruções
         imem->address(pc_out);
+        imem->escrita(escrita);
         imem->instruction(instruction);
 
         // Decodificador
         decod->instruction(instruction);
+        decod->escrita(escrita);
         decod->opcode(opcode);
         decod->rs(rs);
         decod->rt(rt);
@@ -144,7 +172,6 @@ SC_MODULE(MIPS_Simplificado) {
         decod->jump_address(jump_addr_raw);
 
         // Parte operativa 
-        parteOperativa->clk(clk);
         parteOperativa->opcode(opcode);
         parteOperativa->reg_dst(reg_dst);
         parteOperativa->reg_write(reg_write);
@@ -162,7 +189,6 @@ SC_MODULE(MIPS_Simplificado) {
         adder_pc->sum(pc_plus4);
 
         // Deslocador para cálculo do Jump
-        pc_bits = pc_out.read().range(31,28);
         deslocador26to32->pc_high(pc_bits);
         deslocador26to32->instr_index(jump_addr_raw);
         deslocador26to32->jump_address(jump_target); 
@@ -192,7 +218,6 @@ SC_MODULE(MIPS_Simplificado) {
         mux_regdst->output(write_reg);
 
         // Banco de registradores
-        regs->clk(clk);
         regs->read_reg1(rs);
         regs->read_reg2(rt);
         regs->write_reg(write_reg);
@@ -228,7 +253,6 @@ SC_MODULE(MIPS_Simplificado) {
         mux_jump_endereco->pc_next(pc_next);
 
         // Memoria de dados
-        memoriaDados->clk(clk);
         memoriaDados->address(ula_result);
         memoriaDados->write_data(read_data_2);
         memoriaDados->mem_read(mem_read);
@@ -246,66 +270,34 @@ SC_MODULE(MIPS_Simplificado) {
         sensitive << branch << zero;
         dont_initialize();
 
-        // SC_METHOD(update_pc);
-        // sensitive << clk.pos();
-        // dont_initialize();
+        SC_METHOD(control_pc_update);
+        sensitive << clk.pos();  
+        dont_initialize();
 
-        // Depuração
-        //SC_METHOD(show_debug);
-        //sensitive << clk.pos();
+        SC_METHOD(update_pc_bits);
+        sensitive << pc_out;
+        dont_initialize();
     }
 
     ~MIPS_Simplificado() {
-        delete pc;
-        delete imem;
-        delete decod;
-        delete mux_regdst;
-        delete adder_pc;
-        delete regs;
+        delete adder_endereco;
+        delete signE;
+        delete ula;
+        delete ulaControle;
+        delete parteOperativa;
+        delete mux_somador_endereco;
+        delete mux_ula;
+        delete mux_saida_ula;
+        delete mux_jump_endereco;
+        delete deslocador26to32;
+        delete deslocador32;
+        delete memoriaDados;
     }
 
 private:
-    void update_branch_decision() {
-        branch_taken.write(branch.read() && zero.read());
-    }
 
-    // void update_pc() {
-    //     if (reset.read()) {
-    //         pc_next.write(0);
-    //     } else if (clk.posedge()) {
-    //         // O PC será atualizado automaticamente pela saída do mux_jump_endereco
-    //     }
-    // }
-    
-public: 
-    sc_int<32> registers[32]; 
-    sc_int<32> mem[32]; 
+    void control_pc_update() {
 
-    void load_program(const std::vector<uint32_t>& instructions) {
-        for (auto instr : instructions) {
-            imem->add_instruction(instr);
-        }
-    }
-
-    void load_instruction(uint32_t instruction) {
-        // Verificação de valor máximo
-        if (instruction > 0xFFFFFFFF) {
-            std::cerr << "ERRO: Instrução excede 32 bits: 0x"
-                    << std::hex << instruction << std::endl;
-            return;
-        }
-        imem->add_instruction(instruction);
-    }
-
-    void visualization_registers(){
-        regs->dump_registers(registers);
-    }
-
-    void visualization_memory(){
-        memoriaDados->dump_memory(mem);
-    }
-
-    void debug_execution() {
         using std::hex;
         using std::dec;
         using std::setw;
@@ -409,9 +401,56 @@ public:
                 cout << " | Lendo: 0x" << read_data.read() << endl;
             }
             if (mem_write.read()) {
-                cout << " | Escrevendo: 0x" << read_data_2.read() << endl;
+                cout << " | Escrevendo: 0x" << read_data_2.read() << " | Endereço: " << addr<< endl;
             }
         }
+
+    }
+
+    void debug_sync() {
+        cout << "SYNC DEBUG @ " << sc_time_stamp() << ":\n"
+            << "  PC: 0x" << hex << pc_out.read() << "\n"
+            << "  Next PC: 0x" << pc_next.read() << "\n"
+            << "  Mem input: 0x" << imem->address.read() << "\n"
+            << "  Mem output: 0x" << instruction.read() << "\n"
+            << "  Clock phase: " << clk.read() << endl;
+    }
+
+    void update_branch_decision() {
+        branch_taken.write(branch.read() && zero.read());
+    }
+
+    void update_pc_bits() {
+        cout << "\n" << "Endereço atual atualizado" << sc_time_stamp() << "\n";
+        pc_bits.write(pc_out.read().range(31, 28));
+    }
+    
+public: 
+    sc_int<32> registers[32]; 
+    sc_int<32> mem[32]; 
+
+    void load_program(const std::vector<uint32_t>& instructions) {
+        for (auto instr : instructions) {
+            imem->add_instruction(instr);
+        }
+    }
+
+    void load_instruction(uint32_t instruction) {
+        // Verificação de valor máximo
+        if (instruction > 0xFFFFFFFF) {
+            std::cerr << "ERRO: Instrução excede 32 bits: 0x"
+                    << std::hex << instruction << std::endl;
+            return;
+        }
+        imem->add_instruction(instruction);
+    }
+
+    void visualization_registers(){
+        regs->dump_registers(registers);
+    }
+
+    void visualization_memory(){
+        memoriaDados->dump_memory(mem);
     }
 
 };

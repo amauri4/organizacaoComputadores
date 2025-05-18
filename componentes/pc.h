@@ -8,21 +8,27 @@ SC_MODULE(PC) {
     sc_in<bool> reset;
     sc_in<sc_uint<32>> next_addr;
     sc_out<sc_uint<32>> current_addr;
-
-    SC_HAS_PROCESS(PC);
-
-    PC(sc_module_name name) : sc_module(name) {
-        SC_METHOD(update);
-        sensitive << clk.pos();
-        async_reset_signal_is(reset, true);
-    }
+    
+    sc_uint<32> pc_reg;
 
     void update() {
         if (reset.read()) {
+            pc_reg = 0;
             current_addr.write(0);
-        } else {
-            current_addr.write(next_addr.read());
+            cout << "PC RESET @ " << sc_time_stamp() << endl;
         }
+        else if (clk.posedge()) {  
+            pc_reg = next_addr.read();
+            current_addr.write(pc_reg);
+            cout << "PC UPDATE @ " << sc_time_stamp() 
+                 << " | New PC: 0x" << hex << pc_reg << endl;
+        }
+    }
+
+    SC_CTOR(PC) {
+        SC_METHOD(update);
+        sensitive << clk.pos() << reset;
+        dont_initialize();
     }
 };
 

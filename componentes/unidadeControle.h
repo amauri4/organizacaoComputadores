@@ -2,7 +2,6 @@
 
 SC_MODULE(ControlUnit) {
     sc_in<sc_uint<6>> opcode;
-    sc_in_clk clk;
     sc_out<bool> reg_dst, jump, branch, mem_read, mem_to_reg, mem_write, alu_src, reg_write;
     sc_out<sc_uint<2>> alu_op;
     
@@ -94,7 +93,7 @@ SC_MODULE(ControlUnit) {
     
     SC_CTOR(ControlUnit) {
         SC_METHOD(control_process);
-        sensitive << opcode;  // Removido clk.pos() - controle puramente combinacional
+        sensitive << opcode;  
         dont_initialize();
     }
 };

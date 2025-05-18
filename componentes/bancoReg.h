@@ -1,29 +1,66 @@
 #include <systemc.h>
 
 SC_MODULE(RegisterFile) {
-    sc_in<sc_uint<5>> read_reg1, read_reg2, write_reg;
+    // Portas de entrada/saída
+    sc_in_clk clk;  // Clock para sincronização do pipeline
+    sc_in<sc_uint<5>> read_reg1, read_reg2;
+    sc_in<sc_uint<5>> write_reg;
     sc_in<sc_int<32>> write_data;
     sc_in<bool> reg_write;
-    sc_in_clk clk;
     
     sc_out<sc_int<32>> read_data1, read_data2;
     
-    sc_int<32> registers[32]; // 32 registradores de 32 bits
+    // Registradores do banco
+    sc_int<32> registers[32];
     
+    // Estágios de pipeline
+    struct {
+        sc_uint<5> reg1_addr, reg2_addr;
+        sc_int<32> reg1_data, reg2_data;
+    } pipe_stage;
+
     void read() {
-        read_data1.write(registers[read_reg1.read()]);
-        read_data2.write(registers[read_reg2.read()]);
+        // Estágio 1: Busca dos endereços (borda de subida)
+        if (clk.posedge()) {
+            pipe_stage.reg1_addr = read_reg1.read();
+            pipe_stage.reg2_addr = read_reg2.read();
+            
+            // Debug do estágio 1
+            cout << "REGISTER FILE [STAGE1] @ " << sc_time_stamp() << ":\n"
+                 << "  Fetch addresses:\n"
+                 << "    read_reg1 = " << pipe_stage.reg1_addr 
+                 << " (hex: 0x" << hex << pipe_stage.reg1_addr << ")\n"
+                 << "    read_reg2 = " << pipe_stage.reg2_addr 
+                 << " (hex: 0x" << hex << pipe_stage.reg2_addr << ")" << endl;
+        }
         
-        cout << "REG READ @ " << sc_time_stamp() 
-        << " | $" << read_reg1.read() << "=0x" << hex << registers[read_reg1.read()]
-        << " | $" << read_reg2.read() << "=0x" << hex << registers[read_reg2.read()] << endl;
+        // Estágio 2: Leitura dos dados (borda de descida)
+        if (clk.negedge()) {
+            pipe_stage.reg1_data = registers[pipe_stage.reg1_addr];
+            pipe_stage.reg2_data = registers[pipe_stage.reg2_addr];
+            
+            read_data1.write(pipe_stage.reg1_data);
+            read_data2.write(pipe_stage.reg2_data);
+            
+            // Debug do estágio 2
+            cout << "REGISTER FILE [STAGE2] @ " << sc_time_stamp() << ":\n"
+                 << "  Read values:\n"
+                 << "    $" << pipe_stage.reg1_addr << " = 0x" 
+                 << hex << pipe_stage.reg1_data << "\n"
+                 << "    $" << pipe_stage.reg2_addr << " = 0x" 
+                 << hex << pipe_stage.reg2_data << endl;
+        }
     }
     
     void write() {
-        if (reg_write.read() && write_reg.read() != 0 && clk.posedge()) { // $zero não pode ser escrito
-            registers[write_reg.read()] = write_data.read();
-            cout << "REG WRITE @ " << sc_time_stamp() 
-                 << " | $" << write_reg.read() << "=0x" << hex << write_data.read() << endl;
+        // Escrita ocorre na borda de descida
+        if (clk.negedge()) {
+            if (reg_write.read() && write_reg.read() != 0) { // $zero não pode ser escrito
+                registers[write_reg.read()] = write_data.read();
+                cout << "REG WRITE @ " << sc_time_stamp() 
+                     << " | $" << write_reg.read() 
+                     << "=0x" << hex << write_data.read() << endl;
+            }
         }
     }
 
@@ -34,15 +71,24 @@ SC_MODULE(RegisterFile) {
     }
     
     SC_CTOR(RegisterFile) {
+        // Inicializa registradores
         for (int i = 0; i < 32; i++) {
             registers[i] = 0;
         }
         
+        // Inicializa estágio de pipeline
+        pipe_stage.reg1_addr = 0;
+        pipe_stage.reg2_addr = 0;
+        pipe_stage.reg1_data = 0;
+        pipe_stage.reg2_data = 0;
+        
+        // Configura métodos sensíveis
         SC_METHOD(read);
-        sensitive << read_reg1 << read_reg2;
+        sensitive << clk;
+        dont_initialize();
         
         SC_METHOD(write);
-        sensitive << clk.pos();
+        sensitive << clk.neg() << reg_write << write_reg << write_data;
         dont_initialize();
     }
 };

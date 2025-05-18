@@ -9,7 +9,7 @@ LDFLAGS := -L$(SYSTEMC_HOME)/lib -Wl,-rpath,$(SYSTEMC_HOME)/lib
 LIBS := -lsystemc
 
 # Nomes dos arquivos
-SRC := testeMips2.cpp
+SRC := testeMipsPipeline.cpp
 TARGET := test
 
 # Regra principal
