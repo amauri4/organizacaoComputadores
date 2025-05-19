@@ -31,7 +31,8 @@ SC_MODULE(MIPS_Pipelined)
     // sc_out<sc_uint<32>> debug_pc;
     // sc_out<sc_uint<32>> debug_instruction;
     sc_signal<sc_uint<32>> const_four;
-    sc_signal<sc_int<32>> alu_b_before_forward, alu_b_after_forward;;
+    sc_signal<sc_int<32>> alu_b_before_forward, alu_b_after_forward;
+    ;
     // SINAIS DE CONTROLE
 
     sc_signal<bool> ctrl_reg_dst;
@@ -316,13 +317,12 @@ SC_MODULE(MIPS_Pipelined)
         branch_adder->b(extended_imm_shifted);
         branch_adder->sum(branch_target);
 
-        mem_write_stall = (ex_mem.mem_write && !stall_store_signal);
         // Conexões do estágio MEM
         dmem->clk(clk);
         dmem->address(ex_mem.alu_result);
         dmem->write_data(ex_mem.write_data);
         dmem->mem_read(ex_mem.mem_read);
-        dmem->mem_write(mem_write_stall);
+        dmem->mem_write(ex_mem.mem_write);
         dmem->read_data(read_data_mem);
 
         branch_taken = ex_mem.branch.read() && ex_mem.zero.read();
@@ -355,7 +355,7 @@ SC_MODULE(MIPS_Pipelined)
         forwarding_unit->mem_wb_rd(mem_wb.write_reg);
         forwarding_unit->id_ex_rs(id_ex.rs);
         forwarding_unit->id_ex_rt(id_ex.rt);
-        // Saidas 
+        // Saidas
         forwarding_unit->forwardA(forwardA);
         forwarding_unit->forwardB(forwardB);
 
@@ -417,7 +417,7 @@ SC_MODULE(MIPS_Pipelined)
     }
 
 private:
-    sc_signal<sc_int<32>> alu_a_forward, alu_b_forward;
+    sc_signal<sc_int<32>> alu_a_forward;
 
     void check_memory_write()
     {
@@ -436,29 +436,31 @@ private:
         switch (forwardA.read())
         {
         case 0:
-            alu_a_forward.write(id_ex.read_data1);
+            alu_a_forward.write(id_ex.read_data1.read());
             break;
         case 1:
-            alu_a_forward.write(ex_mem.alu_result);
+            alu_a_forward.write(write_data.read()); // write_data.read()
             break;
         case 2:
-            alu_a_forward.write(write_data);
+            alu_a_forward.write(ex_mem.alu_result.read());
             break;
         }
 
-        // RESOLVENDO O FOWARD AQUIIIIII
         // Forwarding para entrada B da ULA
         switch (forwardB.read())
         {
         case 0:
-            alu_b_after_forward.write(alu_b_before_forward);
+            alu_b_after_forward.write(alu_b_before_forward.read());
             break;
         case 1:
-            alu_b_after_forward.write(ex_mem.alu_result);
+            alu_b_after_forward.write(write_data.read()); // write_data.read()
             break;
         case 2:
-            alu_b_after_forward.write(write_data);
+            alu_b_after_forward.write(ex_mem.alu_result.read());
             break;
+        default:
+            alu_b_after_forward.write(alu_b_before_forward.read());
+            cout << "\n\n PROBLEMA NO SELETOR B DA ULA.\n\n";
         }
 
         if (id_ex.mem_write.read())
@@ -467,18 +469,14 @@ private:
             cout << "  RT register: $" << id_ex.rt.read() << endl;
             cout << "  Value from ID/EX: 0x" << hex << id_ex.read_data2.read() << endl;
             cout << "  ForwardB selector: " << forwardB.read() << endl;
-            cout << "  Forwarded value: 0x" << alu_b_forward.read() << endl;
+            cout << "  Forwarded value: 0x" << alu_b_after_forward.read() << endl;
         }
 
         if (ex_mem.mem_write.read())
         {
 
-            cout << "\n" << "SINAIS" << "| REGISTRADOR FONTE NO ID" << rt << "REGISTRADOR DESTINO EX" << id_ex.rt << " | ESCRITA REGISTRADO " 
-                << id_ex.reg_write << "\n| DESTINO MEMORIA" << ex_mem.write_reg << " | ESCRITA MEMORIA "
-                << ex_mem.reg_write <<"\n\n";
-
             cout << "STORE OPERATION @ " << sc_time_stamp()
-                 << " | Data to store: 0x" << hex << alu_b_forward.read()
+                 << " | Data to store: 0x" << hex << alu_b_after_forward.read()
                  << " | Address: 0x" << alu_result.read() << endl;
         }
     }
@@ -520,28 +518,34 @@ private:
             id_ex.reg_dst.write(ctrl_reg_dst.read());
             id_ex.alu_op.write(ctrl_alu_op.read());
             id_ex.funct.write(funct.read());
-
-            // Passa os dados
-            id_ex.pc_plus4.write(if_id.pc_plus4.read());
-            id_ex.read_data1.write(read_data1.read());
-            id_ex.read_data2.write(read_data2.read());
-            id_ex.imm_extended.write(extended_imm.read());
-            id_ex.rs.write(rs.read());
-            id_ex.rt.write(rt.read());
-            id_ex.rd.write(rd.read());
         }
         else
         {
-            // Stalls - zera os sinais de controle
-            id_ex.reg_write.write(0);
-            id_ex.mem_to_reg.write(0);
-            id_ex.branch.write(0);
-            id_ex.mem_read.write(0);
-            id_ex.mem_write.write(0);
-            id_ex.alu_src.write(0);
-            id_ex.reg_dst.write(0);
+            id_ex.funct.write(000000);
+            id_ex.reg_dst.write(false);
+            id_ex.branch.write(false);
+            id_ex.reg_write.write(false);
+            id_ex.mem_to_reg.write(false);
+            id_ex.mem_read.write(false);
+            id_ex.mem_write.write(false);
+            id_ex.alu_src.write(false);
             id_ex.alu_op.write(0);
-            id_ex.funct.write(0);
+        }
+        // Passa os dados independentemente
+        id_ex.pc_plus4.write(if_id.pc_plus4.read());
+        id_ex.read_data1.write(read_data1.read());
+        id_ex.read_data2.write(read_data2.read());
+        id_ex.imm_extended.write(extended_imm.read());
+        id_ex.rs.write(rs.read());
+        id_ex.rt.write(rt.read());
+        id_ex.rd.write(rd.read());
+
+        if (control_mux.read())
+        {
+            cout << "\n\nHAZARD HANDLING:" << endl;
+            cout << "  rs: $" << rs.read() << " rt: $" << rt.read() << " rd: $" << rd.read() << endl;
+            cout << "  Data1: 0x" << hex << read_data1.read() << " Data2: 0x" << read_data2.read() << endl
+                 << endl;
         }
     }
 
@@ -553,19 +557,31 @@ private:
         }
         else
         {
-
             if (id_ex.mem_write.read())
             {
                 cout << "STORE instruction detected in EX/MEM @ " << sc_time_stamp()
-                     << " | Data: 0x" << hex << alu_b_forward.read()
+                     << " | Data: 0x" << hex << alu_b_after_forward.read()
                      << " | Address: 0x" << alu_result.read() << endl;
             }
 
-            ex_mem.reg_write.write(id_ex.reg_write.read());
-            ex_mem.mem_to_reg.write(id_ex.mem_to_reg.read());
-            ex_mem.branch.write(id_ex.branch.read());
-            ex_mem.mem_read.write(id_ex.mem_read.read());
-            ex_mem.mem_write.write(id_ex.mem_write.read());
+            if (!control_mux.read())
+            {
+                ex_mem.reg_write.write(id_ex.reg_write.read());
+                ex_mem.mem_to_reg.write(id_ex.mem_to_reg.read());
+                ex_mem.branch.write(id_ex.branch.read());
+                ex_mem.mem_read.write(id_ex.mem_read.read());
+                ex_mem.mem_write.write(id_ex.mem_write.read());
+            }
+            else
+            {
+                cout << "\n\nEX STAGE DEBUG - alu_b_after_forward: 0x"
+                     << hex << alu_b_after_forward.read() << endl
+                     << endl;
+                ex_mem.zero.write(alu_zero.read());
+                ex_mem.alu_result.write(alu_result.read());
+                ex_mem.write_data.write(alu_b_after_forward.read());
+                ex_mem.write_reg.write(write_reg.read());
+            }
 
             sc_int<32> branch_target_int = branch_target.read();
             if (branch_target_int >= 0)
@@ -577,11 +593,6 @@ private:
                 SC_REPORT_WARNING("Conversion", "Negative address detected");
                 ex_mem.branch_target.write(0);
             }
-
-            ex_mem.zero.write(alu_zero.read());
-            ex_mem.alu_result.write(alu_result.read());
-            ex_mem.write_data.write(alu_b_forward.read());
-            ex_mem.write_reg.write(write_reg.read());
         }
     }
 

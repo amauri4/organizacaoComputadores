@@ -27,7 +27,7 @@ SC_MODULE(PC) {
 
     SC_CTOR(PC) {
         SC_METHOD(update);
-        sensitive << reset;
+        sensitive << reset << enable;
         dont_initialize();
     }
 };

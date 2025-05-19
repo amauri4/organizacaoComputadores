@@ -24,35 +24,26 @@ SC_MODULE(ForwardingUnit) {
     }
     
     void forward_signals() {
-        // Forwarding para entrada A (rs)
-        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0 && 
-            ex_mem_rd.read() == id_ex_rs.read()) {
-            forwardA.write(0b10); // Prioridade para EX/MEM
+        // Forwarding para entrada A da ULA
+        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0 && ex_mem_rd.read() == id_ex_rs.read()) {
+            forwardA.write(0b10); // Forward EX/MEM
         }
-        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0 && 
-                mem_wb_rd.read() == id_ex_rs.read()) {
-            forwardA.write(0b01); // Fallback para MEM/WB
+        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0 && mem_wb_rd.read() == id_ex_rs.read()) {
+            forwardA.write(0b01); // Forward MEM/WB
         }
         else {
-            forwardA.write(0b00); // Sem forwarding
+            forwardA.write(0b00);
         }
-        
-        // Forwarding para entrada B (rt) - ATUALIZAÇÃO CRÍTICA
-        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0) {
-            if (ex_mem_rd.read() == id_ex_rt.read()) {
-                forwardB.write(0b10); // Forward EX/MEM
-                cout << "FORWARDING DETECTED: EX/MEM -> $" << id_ex_rt.read() << endl;
-            }
+
+        // Forwarding para entrada B da ULA (store)
+        if (ex_mem_reg_write.read() && ex_mem_rd.read() != 0 && ex_mem_rd.read() == id_ex_rt.read()) {
+            forwardB.write(0b10); // Prioridade para EX/MEM
         }
-        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0) {
-            if (mem_wb_rd.read() == id_ex_rt.read()) {
-                forwardB.write(0b01); // Forward MEM/WB
-                cout << "FORWARDING DETECTED: MEM/WB -> $" << id_ex_rt.read() << endl;
-            }
+        else if (mem_wb_reg_write.read() && mem_wb_rd.read() != 0 && mem_wb_rd.read() == id_ex_rt.read()) {
+            forwardB.write(0b01); // Fallback para MEM/WB
         }
         else {
-            forwardB.write(0b00); // Sem forwarding
-            cout << "NO FORWARDING NEEDED for $" << id_ex_rt.read() << endl;
+            forwardB.write(0b00);
         }
     }
 };

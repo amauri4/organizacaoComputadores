@@ -54,7 +54,7 @@ SC_MODULE(RegisterFile) {
     
     void write() {
         // Escrita ocorre na borda de descida
-        if (clk.negedge()) {
+        if (clk.posedge()) {
             if (reg_write.read() && write_reg.read() != 0) { // $zero não pode ser escrito
                 registers[write_reg.read()] = write_data.read();
                 cout << "REG WRITE @ " << sc_time_stamp() 
@@ -88,7 +88,7 @@ SC_MODULE(RegisterFile) {
         dont_initialize();
         
         SC_METHOD(write);
-        sensitive << clk.neg(); // << reg_write << write_reg << write_data
+        sensitive << clk.pos(); // << reg_write << write_reg << write_data
         dont_initialize();
     }
 };
