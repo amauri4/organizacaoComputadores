@@ -245,6 +245,7 @@ SC_MODULE(MIPS_Pipelined)
         // Conexões do estágio IF
         pc->reset(reset);
         pc->next_addr(pc_in);
+        pc->clk(clk);
         pc->enable(pc_write);
         pc->current_addr(pc_out);
 
@@ -506,7 +507,7 @@ private:
         {
             id_ex.reset();
         }
-        else if (!control_mux.read())
+        else if (if_id_write)
         {
             // Passa os sinais de controle
             id_ex.reg_write.write(ctrl_reg_write.read());
@@ -518,29 +519,21 @@ private:
             id_ex.reg_dst.write(ctrl_reg_dst.read());
             id_ex.alu_op.write(ctrl_alu_op.read());
             id_ex.funct.write(funct.read());
+            // Passa os dados 
+            id_ex.pc_plus4.write(if_id.pc_plus4.read());
+            id_ex.read_data1.write(read_data1.read());
+            id_ex.read_data2.write(read_data2.read());
+            id_ex.imm_extended.write(extended_imm.read());
+            id_ex.rs.write(rs.read());
+            id_ex.rt.write(rt.read());
+            id_ex.rd.write(rd.read());
         }
         else
         {
-            id_ex.funct.write(000000);
-            id_ex.reg_dst.write(false);
-            id_ex.branch.write(false);
-            id_ex.reg_write.write(false);
-            id_ex.mem_to_reg.write(false);
-            id_ex.mem_read.write(false);
-            id_ex.mem_write.write(false);
-            id_ex.alu_src.write(false);
-            id_ex.alu_op.write(0);
+            // mantem tuod igual (congela)
         }
-        // Passa os dados independentemente
-        id_ex.pc_plus4.write(if_id.pc_plus4.read());
-        id_ex.read_data1.write(read_data1.read());
-        id_ex.read_data2.write(read_data2.read());
-        id_ex.imm_extended.write(extended_imm.read());
-        id_ex.rs.write(rs.read());
-        id_ex.rt.write(rt.read());
-        id_ex.rd.write(rd.read());
 
-        if (control_mux.read())
+        if (control_mux.read() || if_id_write)
         {
             cout << "\n\nHAZARD HANDLING:" << endl;
             cout << "  rs: $" << rs.read() << " rt: $" << rt.read() << " rd: $" << rd.read() << endl;
@@ -564,28 +557,32 @@ private:
                      << " | Address: 0x" << alu_result.read() << endl;
             }
 
-            if (!control_mux.read())
-            {
-                ex_mem.reg_write.write(id_ex.reg_write.read());
-                ex_mem.mem_to_reg.write(id_ex.mem_to_reg.read());
-                ex_mem.branch.write(id_ex.branch.read());
-                ex_mem.mem_read.write(id_ex.mem_read.read());
-                ex_mem.mem_write.write(id_ex.mem_write.read());
-            }
-            else
-            {
-                cout << "\n\nEX STAGE DEBUG - alu_b_after_forward: 0x"
-                     << hex << alu_b_after_forward.read() << endl
-                     << endl;
-                ex_mem.zero.write(alu_zero.read());
-                ex_mem.alu_result.write(alu_result.read());
+            cout << "\n\nEX STAGE DEBUG - alu_b_after_forward: 0x"
+                 << hex << alu_b_after_forward.read() << endl
+                 << endl;
+
+            ex_mem.reg_write.write(id_ex.reg_write.read());
+            ex_mem.mem_to_reg.write(id_ex.mem_to_reg.read());
+            ex_mem.branch.write(id_ex.branch.read());
+            ex_mem.mem_read.write(id_ex.mem_read.read());
+            ex_mem.mem_write.write(id_ex.mem_write.read());
+            ex_mem.zero.write(alu_zero.read());
+            ex_mem.alu_result.write(alu_result.read());
+
+            // Lógica para write_data
+            if (id_ex.mem_write.read()) {
+                // Para instruções store, usa o valor original do registrador
+                ex_mem.write_data.write(id_ex.read_data2.read()); // alu_b_after_forward.read()
+            } else {
+                // Para outras instruções, usa o valor após forwarding
                 ex_mem.write_data.write(alu_b_after_forward.read());
-                ex_mem.write_reg.write(write_reg.read());
             }
+
+            ex_mem.write_reg.write(write_reg.read());
 
             sc_int<32> branch_target_int = branch_target.read();
             if (branch_target_int >= 0)
-            { // Verifica se o valor é não-negativo
+            { 
                 ex_mem.branch_target.write(static_cast<sc_uint<32>>(branch_target_int));
             }
             else

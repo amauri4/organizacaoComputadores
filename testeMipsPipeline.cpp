@@ -104,7 +104,7 @@ int sc_main(int argc, char *argv[])
     // Programa de teste (sem hazards)
     vector<uint32_t> program = {
         0x20010005, // addi $3, $0, 5     (Inicializa $1 = 5)
-        //0x2002000A, // addi $2, $0, 10    (Inicializa $2 = 10)
+        0x2002000A, // addi $2, $0, 10    (Inicializa $2 = 10)
         //0x00221820, // add $3, $1, $2     ($3 = $1 + $2 = 15)
         0xAC030020, // sw $3, 0x20($0)    (Armazena 15 na memória[8])
         //0x8C040020, // lw $4, 0x20($0)    (Carrega $4 = memória[8])

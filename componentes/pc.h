@@ -7,6 +7,7 @@ SC_MODULE(PC) {
     sc_in<bool> reset;
     sc_in<bool> enable;
     sc_in<sc_uint<32>> next_addr;
+    sc_in_clk clk; 
     sc_out<sc_uint<32>> current_addr;
     
     sc_uint<32> pc_reg;
@@ -17,7 +18,7 @@ SC_MODULE(PC) {
             current_addr.write(0);
             cout << "PC RESET @ " << sc_time_stamp() << endl;
         }
-        else if (enable) {  
+        else if (enable && clk.posedge()) {  
             pc_reg = next_addr.read();
             current_addr.write(pc_reg);
             cout << "PC UPDATE @ " << sc_time_stamp() 
@@ -27,7 +28,7 @@ SC_MODULE(PC) {
 
     SC_CTOR(PC) {
         SC_METHOD(update);
-        sensitive << reset << enable;
+        sensitive << clk.pos(); //<< reset << enable;
         dont_initialize();
     }
 };

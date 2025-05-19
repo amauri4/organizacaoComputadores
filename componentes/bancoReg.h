@@ -84,11 +84,11 @@ SC_MODULE(RegisterFile) {
         
         // Configura métodos sensíveis
         SC_METHOD(read);
-        sensitive << clk;
+        sensitive << clk; // neg
         dont_initialize();
         
         SC_METHOD(write);
-        sensitive << clk.pos(); // << reg_write << write_reg << write_data
+        sensitive << clk.pos(); //neg // << reg_write << write_reg << write_data
         dont_initialize();
     }
 };
