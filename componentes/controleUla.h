@@ -42,8 +42,6 @@ SC_MODULE(ALUControl) {
         }
         
         alu_control.write(control);
-        cout << "ALU Control: op=" << op << " funct=" << hex << func 
-             << " => ctrl=" << control << dec << endl;
     }
     
     SC_CTOR(ALUControl) {

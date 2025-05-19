@@ -20,13 +20,13 @@ SC_MODULE(RegisterFile) {
     } pipe_stage;
 
     void read() {
-        // Estágio 1: Busca dos endereços (borda de subida)
+        // Estágio 1: Busca dos endereços (borda de subida) - invertido antes
         if (clk.posedge()) {
             pipe_stage.reg1_addr = read_reg1.read();
             pipe_stage.reg2_addr = read_reg2.read();
             
             // Debug do estágio 1
-            cout << "REGISTER FILE [STAGE1] @ " << sc_time_stamp() << ":\n"
+            cout << "REGISTER FILE [BUSCANDO] @ " << sc_time_stamp() << ":\n"
                  << "  Fetch addresses:\n"
                  << "    read_reg1 = " << pipe_stage.reg1_addr 
                  << " (hex: 0x" << hex << pipe_stage.reg1_addr << ")\n"
@@ -43,7 +43,7 @@ SC_MODULE(RegisterFile) {
             read_data2.write(pipe_stage.reg2_data);
             
             // Debug do estágio 2
-            cout << "REGISTER FILE [STAGE2] @ " << sc_time_stamp() << ":\n"
+            cout << "REGISTER FILE [LENDO OS ENDERECOS] @ " << sc_time_stamp() << ":\n"
                  << "  Read values:\n"
                  << "    $" << pipe_stage.reg1_addr << " = 0x" 
                  << hex << pipe_stage.reg1_data << "\n"
@@ -53,8 +53,8 @@ SC_MODULE(RegisterFile) {
     }
     
     void write() {
-        // Escrita ocorre na borda de descida
-        if (clk.posedge()) {
+        // Escrita ocorre na borda de descida?
+        if (clk.negedge() && reg_write.read()) { // pos ANTES
             if (reg_write.read() && write_reg.read() != 0) { // $zero não pode ser escrito
                 registers[write_reg.read()] = write_data.read();
                 cout << "REG WRITE @ " << sc_time_stamp() 
@@ -88,7 +88,7 @@ SC_MODULE(RegisterFile) {
         dont_initialize();
         
         SC_METHOD(write);
-        sensitive << clk.pos(); //neg // << reg_write << write_reg << write_data
+        sensitive << clk.neg(); //neg // << reg_write << write_reg << write_data
         dont_initialize();
     }
 };

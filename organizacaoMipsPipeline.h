@@ -433,6 +433,11 @@ private:
     void set_alu_inputs()
     {
 
+        cout << "\n\nFORWARDING DEBUG @ " << sc_time_stamp() << ":\n";
+        cout << "  forwardA: " << forwardA.read() << " | forwardB: " << forwardB.read() << "\n";
+        cout << "  alu_a_forward: 0x" << hex << alu_a_forward.read() << "\n";
+        cout << "  alu_b_before_forward: 0x" << alu_b_before_forward.read() << "\n";
+        cout << "  alu_b_after_forward: 0x" << alu_b_after_forward.read() << "\n\n";
         // Forwarding para entrada A da ULA
         switch (forwardA.read())
         {
@@ -498,10 +503,12 @@ private:
     void update_id_ex()
     {
 
-        cout << "EX STAGE @ " << sc_time_stamp()
+        cout << "\n\nEX STAGE @ " << sc_time_stamp()
              << " | ALU Result: 0x" << hex << alu_result.read()
              << " | Base: 0x" << id_ex.read_data1.read()
-             << " | Offset: 0x" << id_ex.imm_extended.read() << endl;
+             << " | Offset: 0x" << id_ex.imm_extended.read() << endl
+             << " | IF ID WRITE: " << if_id_write << endl
+             << endl;
 
         if (reset.read())
         {
@@ -519,7 +526,7 @@ private:
             id_ex.reg_dst.write(ctrl_reg_dst.read());
             id_ex.alu_op.write(ctrl_alu_op.read());
             id_ex.funct.write(funct.read());
-            // Passa os dados 
+            // Passa os dados
             id_ex.pc_plus4.write(if_id.pc_plus4.read());
             id_ex.read_data1.write(read_data1.read());
             id_ex.read_data2.write(read_data2.read());
@@ -530,10 +537,19 @@ private:
         }
         else
         {
-            // mantem tuod igual (congela)
+            id_ex.reg_write.write(0);
+            id_ex.mem_to_reg.write(0);
+            id_ex.branch.write(0);
+            id_ex.mem_read.write(0);
+            id_ex.mem_write.write(0);
+            id_ex.alu_src.write(0);
+            id_ex.reg_dst.write(0);
+            id_ex.alu_op.write(0);
+            id_ex.funct.write(0);       
+        
         }
 
-        if (control_mux.read() || if_id_write)
+        if (control_mux.read())
         {
             cout << "\n\nHAZARD HANDLING:" << endl;
             cout << "  rs: $" << rs.read() << " rt: $" << rt.read() << " rd: $" << rd.read() << endl;
@@ -554,11 +570,15 @@ private:
             {
                 cout << "STORE instruction detected in EX/MEM @ " << sc_time_stamp()
                      << " | Data: 0x" << hex << alu_b_after_forward.read()
-                     << " | Address: 0x" << alu_result.read() << endl;
+                     << " | Address: 0x" << alu_result.read() << " VALOR ANTIGO " << id_ex.read_data2.read() << endl;
             }
 
-            cout << "\n\nEX STAGE DEBUG - alu_b_after_forward: 0x"
-                 << hex << alu_b_after_forward.read() << endl
+            cout << "\n\nEX/MEM UPDATE @ " << sc_time_stamp() << endl;
+            cout << "  ALU Result: 0x" << hex << alu_result.read() << endl;
+            cout << "  ALU B Forwarded: 0x" << alu_b_after_forward.read() << endl;
+            cout << "  ID/EX Data2: 0x" << id_ex.read_data2.read() << endl;
+            cout << "  Write Data Selected: 0x"
+                 << (id_ex.mem_write.read() ? id_ex.read_data2.read() : alu_b_after_forward.read()) << endl
                  << endl;
 
             ex_mem.reg_write.write(id_ex.reg_write.read());
@@ -570,10 +590,13 @@ private:
             ex_mem.alu_result.write(alu_result.read());
 
             // Lógica para write_data
-            if (id_ex.mem_write.read()) {
+            if (id_ex.mem_write.read())
+            {
                 // Para instruções store, usa o valor original do registrador
                 ex_mem.write_data.write(id_ex.read_data2.read()); // alu_b_after_forward.read()
-            } else {
+            }
+            else
+            {
                 // Para outras instruções, usa o valor após forwarding
                 ex_mem.write_data.write(alu_b_after_forward.read());
             }
@@ -582,7 +605,7 @@ private:
 
             sc_int<32> branch_target_int = branch_target.read();
             if (branch_target_int >= 0)
-            { 
+            {
                 ex_mem.branch_target.write(static_cast<sc_uint<32>>(branch_target_int));
             }
             else
@@ -595,6 +618,13 @@ private:
 
     void update_mem_wb()
     {
+        if (ex_mem.mem_write.read())
+        {
+            cout << "MEM STAGE VERIFICATION @ " << sc_time_stamp() << ":\n";
+            cout << "  Address: 0x" << hex << ex_mem.alu_result.read() << "\n";
+            cout << "  Data: 0x" << ex_mem.write_data.read() << "\n";
+            cout << "  MemWrite signal: " << ex_mem.mem_write.read() << "\n";
+        }
         if (reset.read())
         {
             mem_wb.reset();
@@ -605,6 +635,7 @@ private:
             mem_wb.mem_to_reg.write(ex_mem.mem_to_reg.read());
 
             mem_wb.read_data.write(read_data_mem);
+            cout << "\n\nDADO A SER ESCRITO NO BANCO" << write_data << "\n\n";
             mem_wb.alu_result.write(ex_mem.alu_result.read());
             mem_wb.write_reg.write(ex_mem.write_reg.read());
         }

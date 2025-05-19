@@ -29,10 +29,6 @@ SC_MODULE(Decodificador)
         funct.write(inst.range(5, 0));
         // jump_address.write(inst.range(25, 0));
         jump_address.write((inst >> 0) & 0x03FFFFFF);
-        cout << "DECODER DEBUG: "
-             << "Instr=0x" << hex << instruction.read()
-             << " | rt field=0x" << instruction.read().range(20, 16)
-             << " | rt output=" << rt.read() << endl;
     }
 };
 
