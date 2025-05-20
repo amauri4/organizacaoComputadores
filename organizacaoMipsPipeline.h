@@ -107,7 +107,7 @@ SC_MODULE(MIPS_Pipelined)
         sc_signal<bool> reg_write, mem_to_reg, branch, mem_read, mem_write;
 
         // Dados
-        sc_signal<sc_uint<32>> branch_target;
+        sc_signal<sc_int<32>> branch_target;
         sc_signal<bool> zero;
         sc_signal<sc_int<32>> alu_result;
         sc_signal<sc_int<32>> write_data;
@@ -177,7 +177,7 @@ SC_MODULE(MIPS_Pipelined)
 
     sc_signal<bool> jump;
     sc_signal<bool> branch_taken;
-    sc_signal<sc_uint<32>> next_pc;
+    sc_signal<sc_int<32>> next_pc;
 
     sc_signal<sc_int<32>> read_data_mem;
 
@@ -202,8 +202,8 @@ SC_MODULE(MIPS_Pipelined)
     Mux<5> *mux_regdst;
     Mux<32, sc_int<32>> *mux_alu_src;
     Mux<32, sc_int<32>> *mux_mem_to_reg;
-    Mux<32> *mux_pc_branch;
-    Mux<32> *mux_pc_jump;
+    MuxBranch<32> *mux_pc_branch;
+    MuxJump<32> *mux_pc_jump;
     Shifter_26to32 *jump_shifter;
     Shifter_32b *branch_shifter;
     Adder *pc_adder;
@@ -232,8 +232,8 @@ SC_MODULE(MIPS_Pipelined)
         mux_regdst = new Mux<5>("MUX_REGDST");
         mux_alu_src = new Mux<32, sc_int<32>>("MUX_ALU_SRC");
         mux_mem_to_reg = new Mux<32, sc_int<32>>("MUX_MEM_TO_REG");
-        mux_pc_branch = new Mux<32>("MUX_PC_BRANCH");
-        mux_pc_jump = new Mux<32>("MUX_PC_JUMP");
+        mux_pc_branch = new MuxBranch<32>("MUX_PC_BRANCH");
+        mux_pc_jump = new MuxJump<32>("MUX_PC_JUMP");
         jump_shifter = new Shifter_26to32("JUMP_SHIFTER");
         branch_shifter = new Shifter_32b("BRANCH_SHIFTER");
         pc_adder = new Adder("PC_ADDER");
@@ -290,6 +290,30 @@ SC_MODULE(MIPS_Pipelined)
         sign_ext->input(imm);
         sign_ext->output(extended_imm);
 
+        branch_shifter->input(extended_imm);
+        branch_shifter->output(extended_imm_shifted);
+
+        branch_adder->a(id_ex.pc_plus4);
+        branch_adder->b(extended_imm_shifted);
+        branch_adder->sum(branch_target);
+
+        branch_taken = ex_mem.branch.read() && ex_mem.zero.read();
+
+        mux_pc_branch->pc_plus4(pc_plus4);
+        mux_pc_branch->branch_target(ex_mem.branch_target);
+        mux_pc_branch->branch_taken(branch_taken);
+        mux_pc_branch->out(next_pc);
+
+        // SALVAR O PC_BITS E O JUMP_ADDR
+        jump_shifter->pc_high(pc_upper_bits);
+        jump_shifter->instr_index(jump_addr_raw);
+        jump_shifter->jump_address(jump_target);
+
+        mux_pc_jump->branch_mux_out(next_pc);
+        mux_pc_jump->jump_target(jump_target);
+        mux_pc_jump->jump_taken(jump);
+        mux_pc_jump->pc_next(pc_in);
+
         // Conexões do estágio EX
         mux_regdst->input0(id_ex.rt);
         mux_regdst->input1(id_ex.rd);
@@ -311,13 +335,6 @@ SC_MODULE(MIPS_Pipelined)
         ula->zero(alu_zero);
         ula->result(alu_result);
 
-        branch_shifter->input(id_ex.imm_extended);
-        branch_shifter->output(extended_imm_shifted);
-
-        branch_adder->a(id_ex.pc_plus4);
-        branch_adder->b(extended_imm_shifted);
-        branch_adder->sum(branch_target);
-
         // Conexões do estágio MEM
         dmem->clk(clk);
         dmem->address(ex_mem.alu_result);
@@ -325,23 +342,6 @@ SC_MODULE(MIPS_Pipelined)
         dmem->mem_read(ex_mem.mem_read);
         dmem->mem_write(ex_mem.mem_write);
         dmem->read_data(read_data_mem);
-
-        branch_taken = ex_mem.branch.read() && ex_mem.zero.read();
-
-        mux_pc_branch->input0(pc_plus4);
-        mux_pc_branch->input1(ex_mem.branch_target);
-        mux_pc_branch->sel(branch_taken);
-        mux_pc_branch->output(next_pc);
-
-        // SALVAR O PC_BITS E O JUMP_ADDR
-        jump_shifter->pc_high(pc_upper_bits);
-        jump_shifter->instr_index(jump_addr_raw);
-        jump_shifter->jump_address(jump_target);
-
-        mux_pc_jump->input0(next_pc);
-        mux_pc_jump->input1(jump_target);
-        mux_pc_jump->sel(jump);
-        mux_pc_jump->output(pc_in);
 
         // Conexões do estágio WB
         mux_mem_to_reg->input0(mem_wb.alu_result);
@@ -493,7 +493,7 @@ private:
         {
             if_id.reset();
         }
-        else if (if_id_write.read())
+        else if (if_id_write)
         {
             if_id.pc_plus4.write(pc_plus4.read());
             if_id.instruction.write(instruction.read());
@@ -514,7 +514,7 @@ private:
         {
             id_ex.reset();
         }
-        else if (if_id_write)
+        else if (!control_mux)
         {
             // Passa os sinais de controle
             id_ex.reg_write.write(ctrl_reg_write.read());
@@ -527,13 +527,6 @@ private:
             id_ex.alu_op.write(ctrl_alu_op.read());
             id_ex.funct.write(funct.read());
             // Passa os dados
-            id_ex.pc_plus4.write(if_id.pc_plus4.read());
-            id_ex.read_data1.write(read_data1.read());
-            id_ex.read_data2.write(read_data2.read());
-            id_ex.imm_extended.write(extended_imm.read());
-            id_ex.rs.write(rs.read());
-            id_ex.rt.write(rt.read());
-            id_ex.rd.write(rd.read());
         }
         else
         {
@@ -545,9 +538,16 @@ private:
             id_ex.alu_src.write(0);
             id_ex.reg_dst.write(0);
             id_ex.alu_op.write(0);
-            id_ex.funct.write(0);       
-        
+            id_ex.funct.write(0);
         }
+
+        id_ex.pc_plus4.write(if_id.pc_plus4.read());
+        id_ex.read_data1.write(read_data1.read());
+        id_ex.read_data2.write(read_data2.read());
+        id_ex.imm_extended.write(extended_imm.read());
+        id_ex.rs.write(rs.read());
+        id_ex.rt.write(rt.read());
+        id_ex.rd.write(rd.read());
 
         if (control_mux.read())
         {
@@ -560,6 +560,10 @@ private:
 
     void update_ex_mem()
     {
+        cout << "BRANCH DEBUG | Target: " << branch_target.read() 
+             << " | Taken: " << (ex_mem.branch.read() && ex_mem.zero.read())
+             << " | PC: " << pc_in.read();
+
         if (reset.read())
         {
             ex_mem.reset();
@@ -606,7 +610,7 @@ private:
             sc_int<32> branch_target_int = branch_target.read();
             if (branch_target_int >= 0)
             {
-                ex_mem.branch_target.write(static_cast<sc_uint<32>>(branch_target_int));
+                ex_mem.branch_target.write(branch_target_int);
             }
             else
             {
