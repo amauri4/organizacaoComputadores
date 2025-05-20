@@ -560,7 +560,7 @@ private:
 
     void update_ex_mem()
     {
-        cout << "BRANCH DEBUG | Target: " << branch_target.read() 
+        cout << "BRANCH DEBUG | Target: " << branch_target.read()
              << " | Taken: " << (ex_mem.branch.read() && ex_mem.zero.read())
              << " | PC: " << pc_in.read();
 
@@ -591,18 +591,16 @@ private:
             ex_mem.mem_read.write(id_ex.mem_read.read());
             ex_mem.mem_write.write(id_ex.mem_write.read());
             ex_mem.zero.write(alu_zero.read());
-            ex_mem.alu_result.write(alu_result.read());
+            // ex_mem.alu_result.write(alu_result.read());
+            ex_mem.write_data.write(alu_b_after_forward.read());
 
-            // Lógica para write_data
             if (id_ex.mem_write.read())
-            {
-                // Para instruções store, usa o valor original do registrador
-                ex_mem.write_data.write(id_ex.read_data2.read()); // alu_b_after_forward.read()
+            { // Se for uma store
+                ex_mem.alu_result.write(id_ex.read_data2.read() + id_ex.imm_extended.read());
             }
             else
             {
-                // Para outras instruções, usa o valor após forwarding
-                ex_mem.write_data.write(alu_b_after_forward.read());
+                ex_mem.alu_result.write(alu_result.read()); // Caso contrário, use a ULA normal
             }
 
             ex_mem.write_reg.write(write_reg.read());
@@ -622,6 +620,12 @@ private:
 
     void update_mem_wb()
     {
+        if (ex_mem.mem_read.read())
+        {
+            cout << "LOAD DEBUG @ " << sc_time_stamp()
+                 << " | Addr: 0x" << hex << ex_mem.alu_result.read()
+                 << " | Data: 0x" << read_data_mem.read() << endl;
+        }
         if (ex_mem.mem_write.read())
         {
             cout << "MEM STAGE VERIFICATION @ " << sc_time_stamp() << ":\n";
