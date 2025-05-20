@@ -489,6 +489,9 @@ private:
 
     void update_if_id()
     {
+        cout << "\n\nSTAGE DEBUG (IF/ID) @" << sc_time_stamp() << ":\n"
+             << "  IF/ID: " << hex << if_id.instruction.read() << "\n"
+             << "  ID/EX: " << hex << id_ex.alu_op.read() << "\n\n";
         if (reset.read())
         {
             if_id.reset();
@@ -502,6 +505,10 @@ private:
 
     void update_id_ex()
     {
+
+        cout << "\n\nSTAGE DEBUG (ID/EX) @" << sc_time_stamp() << ":\n"
+             << "  IF/ID: " << hex << if_id.instruction.read() << "\n"
+             << "  ID/EX: " << hex << id_ex.alu_op.read() << "\n\n";
 
         cout << "\n\nEX STAGE @ " << sc_time_stamp()
              << " | ALU Result: 0x" << hex << alu_result.read()
@@ -620,6 +627,7 @@ private:
 
     void update_mem_wb()
     {
+
         if (ex_mem.mem_read.read())
         {
             cout << "LOAD DEBUG @ " << sc_time_stamp()

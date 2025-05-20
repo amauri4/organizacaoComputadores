@@ -31,7 +31,8 @@ SC_MODULE(HazardUnit) {
         // 2. Detecta hazard para store (dados não prontos)
         // Modificação: Verifica apenas dependência com a instrução anterior (load)
         bool store_hazard = id_ex_mem_write.read() && 
-                          (id_ex_rt.read() == if_id_rt.read());
+                            ((id_ex_rt.read() == if_id_rs.read()) ||  // Verifica rs
+                            (id_ex_rt.read() == if_id_rt.read()));   // Verifica rt
         
         // Sinalização de controle
         bool hazard = load_use_hazard || store_hazard;

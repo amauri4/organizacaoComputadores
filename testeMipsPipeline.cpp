@@ -105,12 +105,26 @@ int sc_main(int argc, char *argv[])
     vector<uint32_t> program = {
         0x20010005, // addi $3, $0, 5     (Inicializa $1 = 5)
         0x2002000A, // addi $2, $0, 10    (Inicializa $2 = 10)
-        //0x1000FFFE, // beq $zero, $zero, -2  (Pula para 2 instruções antes)
         0x00221820, // add $3, $1, $2     ($3 = $1 + $2 = 15)
         0xAC030020, // sw $3, 0x20($0)    (Armazena 15 na memória[8])
+        0x1000FFFE, // beq $zero, $zero, -2  (Pula para 2 instruções antes)
         0x8C040020, // lw $4, 0x20($0)    (Carrega $4 = memória[8])
         //0x08000006,  // j 0x00000018       (Pula para a última instrução)
         //0x1000FFFE   // beq $zero, $zero, -2  (Pula para 2 instruções antes)
+        // 0x2001000A,  // ADDI $1, $0, 10
+        // 0x20020005,  // ADDI $2, $0, 5
+        // 0x00221820,  // ADD  $3, $1, $2 → $3 = 10 + 5 = 15
+
+        // // Teste operações booleanas AND, OR
+        // 0x2004000F,  // ADDI $4, $0, 15   → novo: $4 = 15
+        // 0x200500F0,  // ADDI $5, $0, 240  → novo: $5 = 240
+        // 0x00853024,  // AND  $6, $4, $5   → $6 = $4 AND $5 = 0
+        // 0x00853825,  // OR   $7, $4, $5   → $7 = $4 OR $5 = 255
+
+        // // Teste shift lógico (SLL)
+        // 0x20080001,  // ADDI $8, $0, 1    → $8 = 1 (quantidade de deslocamento)
+        // 0x20090002,  // ADDI $9, $0, 2    → $9 = 2 (valor a ser deslocado)
+        // 0x01304800   // SLL  $10, $9, $8  → $10 = $9 << 1 = 4
     };
 
     // Carregar programa na memória
@@ -123,7 +137,7 @@ int sc_main(int argc, char *argv[])
     cout << "Iniciando execução do programa..." << endl;
 
     // Executar por 15 ciclos (150ns)
-    for (int i = 0; i < 25; i++)
+    for (int i = 0; i < 15; i++)
     {
         cout << "\n════════════════════════════════════════════════════\n\n";
         cout << "Ciclo " << i << " @ " << sc_time_stamp() << endl;

@@ -11,7 +11,9 @@ SC_MODULE(Mux) {
 
     void process() {
         output.write(sel.read() ? input1.read() : input0.read());
-    }
+        std::cout << "\n ESCRITA REG \n SELETOR: " << sel << "INPUT 1: "<< input1 << "INPUT 0: " 
+                  << input0 << "ESCOLHIDO:" << output << "\n\n";
+     }
 
     SC_CTOR(Mux) {
         SC_METHOD(process);
